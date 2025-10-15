@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OtpType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -17,6 +18,7 @@ class Otp extends Model
 
     protected $casts = [
         'expires_at' => 'datetime',
+        'type' => OtpType::class,
     ];
 
     public function user(): BelongsTo

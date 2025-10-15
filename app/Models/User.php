@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\OtpType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -70,7 +71,7 @@ class User extends Authenticatable
     /**
      * Generate a new OTP code for this user.
      */
-    public function generateOtp(string $type): Otp
+    public function generateOtp(OtpType $type): Otp
     {
         // Invalidate any existing OTPs
         $this->otps()->where('type', $type)->delete();
@@ -79,14 +80,14 @@ class User extends Authenticatable
             'phone' => $this->phone,
             'code' => str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT),
             'type' => $type,
-            'expires_at' => now()->addMinutes(10),
+            'expires_at' => now()->addMinutes($type->expirationMinutes()),
         ]);
     }
 
     /**
      * Verify if the given OTP is valid.
      */
-    public function verifyOtp(string $code, string $type): bool
+    public function verifyOtp(string $code, OtpType $type): bool
     {
         $otp = $this->otps()
             ->where('type', $type)

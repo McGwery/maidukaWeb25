@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\Enums\OtpType;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -30,7 +31,7 @@ class PhoneAuthController extends Controller
         ]);
 
         // Generate verification OTP
-        $otp = $user->generateOtp('verification');
+        $otp = $user->generateOtp(OtpType::VERIFICATION);
 
         // TODO: Send OTP via SMS service
 
@@ -84,7 +85,7 @@ class PhoneAuthController extends Controller
             ]);
         }
 
-        $otp = $user->generateOtp('login');
+        $otp = $user->generateOtp(OtpType::LOGIN);
 
         // TODO: Send OTP via SMS service
 
@@ -103,7 +104,7 @@ class PhoneAuthController extends Controller
 
         $user = User::where('phone', $request->phone)->first();
 
-        if (!$user || !$user->verifyOtp($request->otp, 'login')) {
+        if (!$user || !$user->verifyOtp($request->otp, OtpType::LOGIN)) {
             throw ValidationException::withMessages([
                 'otp' => ['The OTP is invalid or has expired.'],
             ]);
@@ -130,7 +131,7 @@ class PhoneAuthController extends Controller
 
         $user = User::where('phone', $request->phone)->first();
 
-        if (!$user || !$user->verifyOtp($request->otp, 'verification')) {
+        if (!$user || !$user->verifyOtp($request->otp, OtpType::VERIFICATION)) {
             throw ValidationException::withMessages([
                 'otp' => ['The OTP is invalid or has expired.'],
             ]);
@@ -155,7 +156,7 @@ class PhoneAuthController extends Controller
         ]);
 
         $user = User::where('phone', $request->phone)->first();
-        $otp = $user->generateOtp('password_reset');
+        $otp = $user->generateOtp(OtpType::PASSWORD_RESET);
 
         // TODO: Send OTP via SMS service
 
@@ -175,7 +176,7 @@ class PhoneAuthController extends Controller
 
         $user = User::where('phone', $request->phone)->first();
 
-        if (!$user || !$user->verifyOtp($request->otp, 'password_reset')) {
+        if (!$user || !$user->verifyOtp($request->otp, OtpType::PASSWORD_RESET)) {
             throw ValidationException::withMessages([
                 'otp' => ['The OTP is invalid or has expired.'],
             ]);
