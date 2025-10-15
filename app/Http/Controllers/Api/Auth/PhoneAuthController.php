@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 class PhoneAuthController extends Controller
 {
@@ -35,10 +36,11 @@ class PhoneAuthController extends Controller
 
         // TODO: Send OTP via SMS service
 
-        return response()->json([
+        return new JsonResponse([
+            'status' => Response::HTTP_CREATED,
             'message' => 'Registration successful. Please verify your phone number.',
-            'user' => $user,
-        ]);
+            'data' => ['user' => $user],
+        ], Response::HTTP_CREATED);
     }
 
     /**
@@ -54,17 +56,19 @@ class PhoneAuthController extends Controller
         $user = User::where('phone', $request->phone)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'phone' => ['The provided credentials are incorrect.'],
-            ]);
+            return $this->responseUnAuthenticated('The provided credentials are incorrect.');
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user,
+        return new JsonResponse([
+            'status' => Response::HTTP_OK,
+            'message' => 'Login successful',
+            'data' => [
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => $user,
+            ],
         ]);
     }
 
@@ -80,16 +84,17 @@ class PhoneAuthController extends Controller
         $user = User::where('phone', $request->phone)->first();
         
         if (!$user->is_phone_login_enabled) {
-            throw ValidationException::withMessages([
-                'phone' => ['Phone login is not enabled for this account.'],
-            ]);
+            return $this->responseUnAuthorized('Phone login is not enabled for this account.');
         }
 
         $otp = $user->generateOtp(OtpType::LOGIN);
 
         // TODO: Send OTP via SMS service
 
-        return response()->json(['message' => 'OTP sent successfully.']);
+        return new JsonResponse([
+            'status' => Response::HTTP_OK,
+            'message' => 'OTP sent successfully'
+        ]);
     }
 
     /**
@@ -105,17 +110,19 @@ class PhoneAuthController extends Controller
         $user = User::where('phone', $request->phone)->first();
 
         if (!$user || !$user->verifyOtp($request->otp, OtpType::LOGIN)) {
-            throw ValidationException::withMessages([
-                'otp' => ['The OTP is invalid or has expired.'],
-            ]);
+            return $this->responseUnprocessable(['otp' => ['The OTP is invalid or has expired.']]);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user,
+        return new JsonResponse([
+            'status' => Response::HTTP_OK,
+            'message' => 'Login successful',
+            'data' => [
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => $user,
+            ],
         ]);
     }
 
@@ -132,17 +139,16 @@ class PhoneAuthController extends Controller
         $user = User::where('phone', $request->phone)->first();
 
         if (!$user || !$user->verifyOtp($request->otp, OtpType::VERIFICATION)) {
-            throw ValidationException::withMessages([
-                'otp' => ['The OTP is invalid or has expired.'],
-            ]);
+            return $this->responseUnprocessable(['otp' => ['The OTP is invalid or has expired.']]);
         }
 
         $user->phone_verified_at = now();
         $user->save();
 
-        return response()->json([
-            'message' => 'Phone number verified successfully.',
-            'user' => $user,
+        return new JsonResponse([
+            'status' => Response::HTTP_OK,
+            'message' => 'Phone number verified successfully',
+            'data' => ['user' => $user]
         ]);
     }
 
@@ -160,7 +166,10 @@ class PhoneAuthController extends Controller
 
         // TODO: Send OTP via SMS service
 
-        return response()->json(['message' => 'Password reset OTP sent successfully.']);
+        return new JsonResponse([
+            'status' => Response::HTTP_OK,
+            'message' => 'Password reset OTP sent successfully'
+        ]);
     }
 
     /**
@@ -177,14 +186,15 @@ class PhoneAuthController extends Controller
         $user = User::where('phone', $request->phone)->first();
 
         if (!$user || !$user->verifyOtp($request->otp, OtpType::PASSWORD_RESET)) {
-            throw ValidationException::withMessages([
-                'otp' => ['The OTP is invalid or has expired.'],
-            ]);
+            return $this->responseUnprocessable(['otp' => ['The OTP is invalid or has expired.']]);
         }
 
         $user->password = Hash::make($request->password);
         $user->save();
 
-        return response()->json(['message' => 'Password reset successfully.']);
+        return new JsonResponse([
+            'status' => Response::HTTP_OK,
+            'message' => 'Password reset successfully'
+        ]);
     }
 }
