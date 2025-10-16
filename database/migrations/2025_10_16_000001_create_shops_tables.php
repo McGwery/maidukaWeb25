@@ -9,26 +9,28 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('shops', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('owner_id')->constrained('users')->onDelete('cascade');
             $table->string('name');
-            $table->string('type'); // e.g., Retail, Cafe, etc.
-            $table->string('status')->default('active'); // active, inactive, suspended
-            $table->boolean('is_online')->default(false);
-            $table->string('address')->nullable();
-            $table->string('phone')->nullable();
-            $table->string('email')->nullable();
-            $table->text('description')->nullable();
-            $table->json('business_hours')->nullable();
-            $table->foreignId('owner_id')->constrained('users')->onDelete('cascade');
+            $table->string('business_type');
+            $table->string('phone_number', 20)->nullable();
+            $table->string('address', 1000);
+            $table->string('agent_code')->nullable()->unique();
+            $table->string('currency');
+            $table->string('image_url', 2048)->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['owner_id', 'is_active']);
+            $table->index('agent_code');
         });
 
         Schema::create('shop_members', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('shop_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('role'); // owner, manager, staff, cashier
+            $table->uuid('id')->primary();
+            $table->foreignUuid('shop_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+            $table->string('role');
             $table->json('permissions')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
@@ -36,9 +38,9 @@ return new class extends Migration
         });
 
         Schema::create('active_shops', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('shop_id')->constrained()->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('shop_id')->constrained()->onDelete('cascade');
             $table->timestamp('selected_at');
             $table->unique('user_id');
         });

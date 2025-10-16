@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,24 +12,25 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Shop extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasUuid, SoftDeletes;
 
     protected $fillable = [
         'name',
-        'type',
-        'status',
-        'is_online',
+        'business_type',
+        'phone_number',
         'address',
-        'phone',
-        'email',
-        'description',
-        'business_hours',
-        'owner_id',
+        'agent_code',
+        'currency',
+        'image_url',
+        'is_active',
+        'status', // active, inactive, suspended
+       // 'availability' // ONLINE, OFFLINE, BOTH
     ];
 
     protected $casts = [
-        'is_online' => 'boolean',
-        'business_hours' => 'array',
+        'business_type' => \App\Enums\ShopType::class,
+        'currency' => \App\Enums\Currency::class,
+        'is_active' => 'boolean'
     ];
 
     public function owner(): BelongsTo

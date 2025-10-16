@@ -2,35 +2,37 @@
 
 namespace App\Models;
 
-use App\Enums\OtpType;
 use App\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Otp extends Model
+class ShopMember extends Model
 {
     use HasUuid;
-    
+
     protected $fillable = [
+        'shop_id',
         'user_id',
-        'phone',
-        'code',
-        'type',
-        'expires_at',
+        'role',
+        'permissions'
     ];
 
     protected $casts = [
-        'expires_at' => 'datetime',
-        'type' => OtpType::class,
+        'permissions' => 'array'
     ];
+
+    public function shop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class);
+    }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function isValid(): bool
+    public function hasPermission(string $permission): bool
     {
-        return $this->expires_at->isFuture();
+        return in_array($permission, $this->permissions ?? []);
     }
 }

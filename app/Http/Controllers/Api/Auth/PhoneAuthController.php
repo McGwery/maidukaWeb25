@@ -254,4 +254,18 @@ class PhoneAuthController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Log the user out (Invalidate the token).
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return new JsonResponse([
+            'success' => true,
+            'code' => Response::HTTP_OK,
+            'message' => 'Successfully logged out'
+        ]);
+    }
 }

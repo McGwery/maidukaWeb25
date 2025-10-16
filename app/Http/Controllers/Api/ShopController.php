@@ -91,7 +91,7 @@ class ShopController extends Controller
             return new JsonResponse([
                 'success' => false,
                 'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'You do not have permission to update this shop'
+                'message' => 'You do not have permission to update this shop',
             ], Response::HTTP_FORBIDDEN);
         }
 
