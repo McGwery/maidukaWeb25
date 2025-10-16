@@ -53,7 +53,7 @@ class PhoneAuthController extends Controller
     /**
      * Login with phone and password.
      */
-    public function login(Request $request): JsonResponse
+    public function loginWithPassword(Request $request): JsonResponse
     {
         // Validation handled by LoginRequest
         $request->validate([
@@ -61,7 +61,11 @@ class PhoneAuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::where('phone', $request->phone)->first();
+        $user = User::where('phone', $request->phone)
+            ->with(['activeShop.shop' => function($query) {
+                $query->with('owner');
+            }])
+            ->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             return new JsonResponse([
@@ -133,14 +137,18 @@ class PhoneAuthController extends Controller
      */
     public function loginWithOtp(Request $request): JsonResponse
     {
-        // Validation handled by OtpVerificationRequest
 
         // Validation handled by OtpVerificationRequest
         $request->validate([
             'phone' => ['required', 'string'],
+            'otp' => ['required', 'string'],
         ]);
 
-        $user = User::where('phone', $request->phone)->first();
+        $user = User::where('phone', $request->phone)
+            ->with(['activeShop.shop' => function($query) {
+                $query->with('owner');
+            }])
+            ->first();
 
         if (!$user || !$user->verifyOtp($request->otp, OtpType::LOGIN)) {
             return new JsonResponse([

@@ -12,7 +12,7 @@ Route::prefix('auth')->group(function () {
     Route::post('/verify-phone', [PhoneAuthController::class, 'verifyPhone']);
 
     // Login routes
-    Route::post('/login', [PhoneAuthController::class, 'login']);
+    Route::post('/login', [PhoneAuthController::class, 'loginWithPassword']);
     Route::post('/login/otp/request', [PhoneAuthController::class, 'requestLoginOtp']);
     Route::post('/login/otp/verify', [PhoneAuthController::class, 'loginWithOtp']);
 
