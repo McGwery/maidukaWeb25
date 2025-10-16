@@ -18,15 +18,21 @@ Route::prefix('auth')->group(function () {
     // Password reset routes
     Route::post('/password/reset/request', [PhoneAuthController::class, 'requestPasswordResetOtp'])->name('auth.password.reset.request');
     Route::post('/password/reset', [PhoneAuthController::class, 'resetPassword'])->name('auth.password.reset');
+
+    Route::post('/logout', [PhoneAuthController::class, 'logout'])
+        ->middleware('auth:sanctum');
 });
 
-# Shop Management
+
 Route::middleware('auth:sanctum')->group(function () {
+    //  Shop Management
     Route::prefix('shops')->group(function () {
         Route::get('/', [ShopController::class, 'index']);
         Route::post('/', [ShopController::class, 'store']);
         Route::get('/{shop}', [ShopController::class, 'show']);
         Route::put('/{shop}', [ShopController::class, 'update']);
         Route::post('/{shop}/switch', [ShopController::class, 'switchShop']);
+        Route::post('/{shop}/active', [ShopController::class, 'setActive']);
+        Route::get('/active', [ShopController::class, 'getActive']);
     });
 });
