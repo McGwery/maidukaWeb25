@@ -13,7 +13,7 @@ class ShopMemberResource extends JsonResource
         $role = ShopMemberRole::from($this->role);
 
         return [
-            'shopMemberid' => $this->id,
+            'id' => $this->id,
             'user' => new UserResource($this->whenLoaded('user')),
             'role' => [
                 'value' => $role->value,

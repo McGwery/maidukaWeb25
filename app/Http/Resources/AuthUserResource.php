@@ -14,7 +14,7 @@ class AuthUserResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'userId' => $this->id,
+            'id' => $this->id,
             'name' => $this->name,
             'phone' => $this->phone,
             'isPhoneVerified' => !is_null($this->phone_verified_at),

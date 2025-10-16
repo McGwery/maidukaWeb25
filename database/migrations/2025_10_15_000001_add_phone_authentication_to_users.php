@@ -18,7 +18,7 @@ return new class extends Migration
         });
 
         Schema::create('otps', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('phone');
             $table->string('code');

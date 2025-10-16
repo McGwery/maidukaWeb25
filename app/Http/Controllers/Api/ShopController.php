@@ -131,4 +131,46 @@ class ShopController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
     }
+
+    /**
+     * Set shop active status.
+     */
+    public function setActive(Shop $shop): JsonResponse
+    {
+        if (!auth()->user()->hasShopPermission($shop, 'manage_shop')) {
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_FORBIDDEN,
+                'message' => 'You do not have permission to update this shop',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $shop->status = $shop->status === 'active' ? 'inactive' : 'active';
+        $shop->save();
+
+        return new JsonResponse([
+            'success' => true,
+            'code' => Response::HTTP_OK,
+            'message' => 'Shop status updated successfully',
+            'data' => [
+                'shop' => new ShopResource($shop->load('owner')),
+            ]
+        ]);
+    }
+
+    /**
+     * Get the active shop for the authenticated user.
+     */
+    public function getActive(): JsonResponse
+    {
+        $activeShop = auth()->user()->activeShop;
+
+        return new JsonResponse([
+            'success' => true,
+            'code' => Response::HTTP_OK,
+            'data' => [
+                'shop' => $activeShop ? new ShopResource($activeShop->shop->load('owner')) : null,
+            ]
+        ]);
+    }
 }

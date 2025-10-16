@@ -93,10 +93,12 @@ class PhoneAuthController extends Controller
     /**
      * Request OTP for login.
      */
-    public function requestLoginOtp(OtpVerificationRequest $request): JsonResponse
+    public function requestLoginOtp(Request $request): JsonResponse
     {
         // Validation handled by OtpVerificationRequest
-        $request->validated();
+        $request->validate([
+            'phone' => ['required', 'string'],
+        ]);
 
         $user = User::where('phone', $request->phone)->first();
 
@@ -129,11 +131,14 @@ class PhoneAuthController extends Controller
     /**
      * Login with OTP.
      */
-    public function loginWithOtp(OtpVerificationRequest $request): JsonResponse
+    public function loginWithOtp(Request $request): JsonResponse
     {
         // Validation handled by OtpVerificationRequest
 
-        $request->validated();
+        // Validation handled by OtpVerificationRequest
+        $request->validate([
+            'phone' => ['required', 'string'],
+        ]);
 
         $user = User::where('phone', $request->phone)->first();
 
@@ -187,12 +192,16 @@ class PhoneAuthController extends Controller
 
         $user->phone_verified_at = now();
         $user->save();
-
+        $token = $user->createToken('auth_token')->plainTextToken;
         return new JsonResponse([
             'success' => true,
             'code' => Response::HTTP_OK,
             'message' => 'Phone number verified successfully',
             'data' => [
+                'token' => [
+                    'accessToken' => $token,
+                    'tokenType' => 'Bearer'
+                ],
                 'user' => new AuthUserResource($user)
             ]
         ]);
