@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\PhoneAuthController;
 use Illuminate\Support\Facades\Route;
 
+# Authentication Management
 Route::prefix('auth')->group(function () {
     // Registration and verification routes
     Route::post('/register', [PhoneAuthController::class, 'register']);
