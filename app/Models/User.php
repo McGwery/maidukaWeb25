@@ -4,15 +4,17 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\OtpType;
+use App\Jobs\SendOtpJob;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
@@ -76,12 +78,16 @@ class User extends Authenticatable
         // Invalidate any existing OTPs
         $this->otps()->where('type', $type)->delete();
 
-        return $this->otps()->create([
+        $generatedOtp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+       
+        $otp =  $this->otps()->create([
             'phone' => $this->phone,
-            'code' => str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT),
+            'code' => $generatedOtp,
             'type' => $type,
             'expires_at' => now()->addMinutes($type->expirationMinutes()),
         ]);
+        SendOtpJob::dispatch($this, $otp);
+        return $otp;
     }
 
     /**

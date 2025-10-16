@@ -15,6 +15,6 @@ Route::prefix('auth')->group(function () {
     Route::post('/login/otp/verify', [PhoneAuthController::class, 'loginWithOtp']);
 
     // Password reset routes
-    Route::post('/password/reset/request', [PhoneAuthController::class, 'requestPasswordResetOtp']);
-    Route::post('/password/reset', [PhoneAuthController::class, 'resetPassword']);
+    Route::post('/password/reset/request', [PhoneAuthController::class, 'requestPasswordResetOtp'])->name('auth.password.reset.request');
+    Route::post('/password/reset', [PhoneAuthController::class, 'resetPassword'])->name('auth.password.reset');
 });

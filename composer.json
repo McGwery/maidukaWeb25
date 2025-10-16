@@ -10,10 +10,13 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "bryceandy/laravel-beem": "dev-master",
         "essa/api-tool-kit": "^2.2",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/fortify": "^1.30",
         "laravel/framework": "^12.0",
+        "laravel/horizon": "^5.36",
+        "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "laravel/wayfinder": "^0.1.9"
     },
@@ -69,6 +72,12 @@
             "@php artisan test"
         ]
     },
+     "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/mcgwery/laravel-beem"
+        }
+    ],
     "extra": {
         "laravel": {
             "dont-discover": []

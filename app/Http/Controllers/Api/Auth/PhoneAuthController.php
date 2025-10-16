@@ -4,11 +4,15 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Enums\OtpType;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\OtpVerificationRequest;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\ResetPasswordRequest;
+use App\Http\Resources\AuthUserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class PhoneAuthController extends Controller
@@ -16,14 +20,10 @@ class PhoneAuthController extends Controller
     /**
      * Register a new user with phone number.
      */
-    public function register(Request $request): JsonResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
-        $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'unique:users,phone'],
-            'password' => ['required', 'string', 'min:8'],
-        ]);
-
+        // Validation handled by RegisterRequest
+        $request->validated();
         $user = User::create([
             'name' => $request->name,
             'phone' => $request->phone,
@@ -37,9 +37,16 @@ class PhoneAuthController extends Controller
         // TODO: Send OTP via SMS service
 
         return new JsonResponse([
-            'status' => Response::HTTP_CREATED,
+            'success' => true,
+            'code' => Response::HTTP_CREATED,
             'message' => 'Registration successful. Please verify your phone number.',
-            'data' => ['user' => $user],
+            'data' => [
+                'user' => new AuthUserResource($user),
+                'meta' => [
+                    'requiresVerification' => true,
+                    'verificationMethod' => 'otp'
+                ]
+            ]
         ], Response::HTTP_CREATED);
     }
 
@@ -48,6 +55,7 @@ class PhoneAuthController extends Controller
      */
     public function login(Request $request): JsonResponse
     {
+        // Validation handled by LoginRequest
         $request->validate([
             'phone' => ['required', 'string'],
             'password' => ['required', 'string'],
@@ -56,35 +64,51 @@ class PhoneAuthController extends Controller
         $user = User::where('phone', $request->phone)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
-            return $this->responseUnAuthenticated('The provided credentials are incorrect.');
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_UNAUTHORIZED,
+                'message' => 'The provided credentials are incorrect.',
+                'errors' => [
+                    'credentials' => ['Invalid phone number or password']
+                ]
+            ], Response::HTTP_UNAUTHORIZED);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return new JsonResponse([
-            'status' => Response::HTTP_OK,
+            'success' => true,
+            'code' => Response::HTTP_OK,
             'message' => 'Login successful',
             'data' => [
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'user' => $user,
-            ],
+                'token' => [
+                    'accessToken' => $token,
+                    'tokenType' => 'Bearer'
+                ],
+                'user' => new AuthUserResource($user)
+            ]
         ]);
     }
 
     /**
      * Request OTP for login.
      */
-    public function requestLoginOtp(Request $request): JsonResponse
+    public function requestLoginOtp(OtpVerificationRequest $request): JsonResponse
     {
-        $request->validate([
-            'phone' => ['required', 'string', 'exists:users,phone'],
-        ]);
+        // Validation handled by OtpVerificationRequest
+        $request->validated();
 
         $user = User::where('phone', $request->phone)->first();
-        
+
         if (!$user->is_phone_login_enabled) {
-            return $this->responseUnAuthorized('Phone login is not enabled for this account.');
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_FORBIDDEN,
+                'message' => 'Phone login is not enabled for this account.',
+                'errors' => [
+                    'phone' => ['OTP login is disabled for this account']
+                ]
+            ], Response::HTTP_FORBIDDEN);
         }
 
         $otp = $user->generateOtp(OtpType::LOGIN);
@@ -92,74 +116,95 @@ class PhoneAuthController extends Controller
         // TODO: Send OTP via SMS service
 
         return new JsonResponse([
-            'status' => Response::HTTP_OK,
-            'message' => 'OTP sent successfully'
+            'success' => true,
+            'code' => Response::HTTP_OK,
+            'message' => 'OTP sent successfully',
+            'data' => [
+                'otpExpiresIn' => $otp->expires_at->diffInSeconds(now()),
+                'phone' => $user->phone
+            ]
         ]);
     }
 
     /**
      * Login with OTP.
      */
-    public function loginWithOtp(Request $request): JsonResponse
+    public function loginWithOtp(OtpVerificationRequest $request): JsonResponse
     {
-        $request->validate([
-            'phone' => ['required', 'string'],
-            'otp' => ['required', 'string', 'size:6'],
-        ]);
+        // Validation handled by OtpVerificationRequest
+
+        $request->validated();
 
         $user = User::where('phone', $request->phone)->first();
 
         if (!$user || !$user->verifyOtp($request->otp, OtpType::LOGIN)) {
-            return $this->responseUnprocessable(['otp' => ['The OTP is invalid or has expired.']]);
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                'message' => 'Invalid or expired OTP',
+                'errors' => [
+                    'otp' => ['The OTP is invalid or has expired']
+                ]
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return new JsonResponse([
-            'status' => Response::HTTP_OK,
+            'success' => true,
+            'code' => Response::HTTP_OK,
             'message' => 'Login successful',
             'data' => [
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'user' => $user,
-            ],
+                'token' => [
+                    'accessToken' => $token,
+                    'tokenType' => 'Bearer'
+                ],
+                'user' => new AuthUserResource($user)
+            ]
         ]);
     }
 
     /**
      * Verify phone number.
      */
-    public function verifyPhone(Request $request): JsonResponse
+    public function verifyPhone(OtpVerificationRequest $request): JsonResponse
     {
-        $request->validate([
-            'phone' => ['required', 'string'],
-            'otp' => ['required', 'string', 'size:6'],
-        ]);
+        // Validation handled by OtpVerificationRequest
+        $request->validated();
 
         $user = User::where('phone', $request->phone)->first();
 
         if (!$user || !$user->verifyOtp($request->otp, OtpType::VERIFICATION)) {
-            return $this->responseUnprocessable(['otp' => ['The OTP is invalid or has expired.']]);
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                'message' => 'Invalid or expired OTP',
+                'errors' => [
+                    'otp' => ['The OTP is invalid or has expired']
+                ]
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $user->phone_verified_at = now();
         $user->save();
 
         return new JsonResponse([
-            'status' => Response::HTTP_OK,
+            'success' => true,
+            'code' => Response::HTTP_OK,
             'message' => 'Phone number verified successfully',
-            'data' => ['user' => $user]
+            'data' => [
+                'user' => new AuthUserResource($user)
+            ]
         ]);
     }
 
     /**
      * Request password reset OTP.
      */
-    public function requestPasswordResetOtp(Request $request): JsonResponse
+    public function requestPasswordResetOtp(ResetPasswordRequest $request): JsonResponse
     {
-        $request->validate([
-            'phone' => ['required', 'string', 'exists:users,phone'],
-        ]);
+        // Validation handled by ResetPasswordRequest
+        $request->validated();
 
         $user = User::where('phone', $request->phone)->first();
         $otp = $user->generateOtp(OtpType::PASSWORD_RESET);
@@ -167,34 +212,46 @@ class PhoneAuthController extends Controller
         // TODO: Send OTP via SMS service
 
         return new JsonResponse([
-            'status' => Response::HTTP_OK,
-            'message' => 'Password reset OTP sent successfully'
+            'success' => true,
+            'code' => Response::HTTP_OK,
+            'message' => 'Password reset OTP sent successfully',
+            'data' => [
+                'otpExpiresIn' => $otp->expires_at->diffInSeconds(now()),
+                'phone' => $user->phone
+            ]
         ]);
     }
 
     /**
      * Reset password with OTP.
      */
-    public function resetPassword(Request $request): JsonResponse
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
-        $request->validate([
-            'phone' => ['required', 'string'],
-            'otp' => ['required', 'string', 'size:6'],
-            'password' => ['required', 'string', 'min:8'],
-        ]);
+        // Validation handled by ResetPasswordRequest
 
         $user = User::where('phone', $request->phone)->first();
 
         if (!$user || !$user->verifyOtp($request->otp, OtpType::PASSWORD_RESET)) {
-            return $this->responseUnprocessable(['otp' => ['The OTP is invalid or has expired.']]);
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                'message' => 'Invalid or expired OTP',
+                'errors' => [
+                    'otp' => ['The OTP is invalid or has expired']
+                ]
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $user->password = Hash::make($request->password);
         $user->save();
 
         return new JsonResponse([
-            'status' => Response::HTTP_OK,
-            'message' => 'Password reset successfully'
+            'success' => true,
+            'code' => Response::HTTP_OK,
+            'message' => 'Password reset successfully',
+            'data' => [
+                'user' => new AuthUserResource($user)
+            ]
         ]);
     }
 }
