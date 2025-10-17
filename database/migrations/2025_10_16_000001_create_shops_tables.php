@@ -28,8 +28,8 @@ return new class extends Migration
 
         Schema::create('shop_members', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('shop_id')->constrained()->onDelete('cascade');
-            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('shop_id')->constrained('shops')->onDelete('cascade');
+            $table->foreignUuid('user_id')->constrained('users')->onDelete('cascade');
             $table->string('role');
             $table->json('permissions')->nullable();
             $table->boolean('is_active')->default(true);

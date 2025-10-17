@@ -1,0 +1,50 @@
+
+services:
+    maiduka_db:
+        image: mysql:8.0.0
+        container_name: maiduka_con
+        environment:
+            MYSQL_USER: "McGwery"
+            MYSQL_DATABASE: "appdb"
+            MYSQL_ROOT_PASSWORD: "McGwery@1870M"
+            MYSQL_PASSWORD: "McGwery1860"
+        volumes:
+            - maiduka_db_data:/backup
+        ports:
+            - "3312:3306"
+        networks:
+            - maiduka_network
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    # Redis Cache & Queue
+    redis:
+        image: redis:alpine
+        container_name: maiduka-redis
+        command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+        volumes:
+            - maiduka_redis_data:/data
+        ports:
+            - "6040:6379"
+        networks:
+            - maiduka_network
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+
+networks:
+    maiduka_network:
+        driver: bridge
+
+volumes:
+    maiduka_db_data:
+        driver: local
+    maiduka_redis_data:
+        driver: local

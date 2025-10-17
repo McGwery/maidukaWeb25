@@ -19,7 +19,7 @@ return new class extends Migration
 
         Schema::create('otps', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('user_id')->constrained('users')->onDelete('cascade');
             $table->string('phone');
             $table->string('code');
             $table->string('type'); // verification, login, password_reset
