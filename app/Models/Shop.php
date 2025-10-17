@@ -20,6 +20,7 @@ class Shop extends Model
         'phone_number',
         'address',
         'agent_code',
+        'owner_id',
         'currency',
         'image_url',
         'is_active',

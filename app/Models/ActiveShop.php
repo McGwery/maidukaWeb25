@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ActiveShop extends Model
 {
     use HasUuid;
+
+    public $timestamps = false;     
     
     protected $fillable = [
         'user_id',

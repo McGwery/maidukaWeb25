@@ -43,6 +43,7 @@ return new class extends Migration
             $table->foreignUuid('shop_id')->constrained()->onDelete('cascade');
             $table->timestamp('selected_at');
             $table->unique('user_id');
+            
         });
     }
 

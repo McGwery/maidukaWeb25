@@ -34,7 +34,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{shop}', [ShopController::class, 'destroy']);
         Route::post('/{shop}/switch', [ShopController::class, 'switchShop']);
         Route::post('/{shop}/active', [ShopController::class, 'setActive']);
-        Route::get('/active', [ShopController::class, 'getActive']);
 
         // Shop Members Management
         Route::get('/{shop}/members', [ShopMemberController::class, 'index']);

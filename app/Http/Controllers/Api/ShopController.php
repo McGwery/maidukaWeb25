@@ -12,16 +12,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ShopController extends Controller
 {
+   
     /**
      * Get all shops for the authenticated user.
      */
     public function index(): JsonResponse
     {
         $user = auth()->user();
+
+      
         $shops = $user->ownedShops()
             ->with('owner')
-            ->union($user->memberShops()->with('owner'))
-            ->get();
+            ->get()
+            ->union($user->memberShops()->with('owner')->get())
+            ->values();
 
         return new JsonResponse([
             'success' => true,
@@ -107,6 +111,19 @@ class ShopController extends Controller
         ]);
     }
 
+      public function destroy(Shop $shop): JsonResponse
+    {
+        $this->authorize('delete', $shop);
+
+        $shop->delete();
+
+          return new JsonResponse([
+            'success' => true,
+            'code' => Response::HTTP_NO_CONTENT,
+            'message'=>'Shop removed successfuly',
+            'data' => null 
+        ]);
+    }
     /**
      * Switch active shop.
      */
@@ -145,7 +162,7 @@ class ShopController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $shop->status = $shop->status === 'active' ? 'inactive' : 'active';
+        $shop->is_active = !$shop->is_active;
         $shop->save();
 
         return new JsonResponse([
@@ -158,19 +175,5 @@ class ShopController extends Controller
         ]);
     }
 
-    /**
-     * Get the active shop for the authenticated user.
-     */
-    public function getActive(): JsonResponse
-    {
-        $activeShop = auth()->user()->activeShop;
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'shop' => $activeShop ? new ShopResource($activeShop->shop->load('owner')) : null,
-            ]
-        ]);
-    }
 }
