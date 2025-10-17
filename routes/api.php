@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\PhoneAuthController;
+use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\ShopMemberController;
 use Illuminate\Support\Facades\Route;
@@ -25,8 +26,9 @@ Route::prefix('auth')->group(function () {
 
 
 Route::middleware('auth:sanctum')->group(function () {
-    //  Shop Management
+   
     Route::prefix('shops')->group(function () {
+         //  Shop Management
         Route::get('/', [ShopController::class, 'index']);
         Route::post('/', [ShopController::class, 'store']);
         Route::get('/{shop}', [ShopController::class, 'show']);
@@ -36,10 +38,23 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{shop}/active', [ShopController::class, 'setActive']);
 
         // Shop Members Management
-        Route::get('/{shop}/members', [ShopMemberController::class, 'index']);
-        Route::post('/{shop}/members', [ShopMemberController::class, 'store']);
-        Route::get('/{shop}/members/{member}', [ShopMemberController::class, 'show']);
-        Route::put('/{shop}/members/{member}', [ShopMemberController::class, 'update']);
-        Route::delete('/{shop}/members/{member}', [ShopMemberController::class, 'destroy']);
+        Route::group(['prefix' => '{shop}/members'], function () {
+            Route::get('/', [ShopMemberController::class, 'index']);
+            Route::post('/', [ShopMemberController::class, 'store']);
+            Route::get('/{member}', [ShopMemberController::class, 'show']);
+            Route::put('/{member}', [ShopMemberController::class, 'update']);
+            Route::delete('/{member}', [ShopMemberController::class, 'destroy']);
+        });
+
+        // Product Management
+        Route::group(['prefix' => '{shop}/products'], function () {
+            Route::get('/', [ProductController::class, 'index']);
+            Route::post('/', [ProductController::class, 'store']);
+            Route::get('/{product}', [ProductController::class, 'show']);
+            Route::put('/{product}', [ProductController::class, 'update']);
+            Route::delete('/{product}', [ProductController::class, 'destroy']);
+            Route::patch('/{product}/stock', [ProductController::class, 'updateStock']);
+        });
+        
     });
 });
