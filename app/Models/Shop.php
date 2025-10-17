@@ -46,6 +46,11 @@ class Shop extends Model
             ->withTimestamps();
     }
 
+    public function shopMembers(): HasMany
+    {
+        return $this->hasMany(ShopMember::class);
+    }
+
     public function activeMembers(): BelongsToMany
     {
         return $this->members()->wherePivot('is_active', true);
@@ -73,6 +78,6 @@ class Shop extends Model
 
     public function isMember(User $user): bool
     {
-        return $this->members()->where('user_id', $user->id)->exists();
+        return $this->members()->wherePivot('user_id', $user->id)->exists();
     }
 }

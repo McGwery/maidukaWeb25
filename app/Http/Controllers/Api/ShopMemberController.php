@@ -10,8 +10,7 @@ use App\Models\Shop;
 use App\Models\ShopMember;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class ShopMemberController extends Controller
@@ -22,7 +21,7 @@ class ShopMemberController extends Controller
     {
         $this->authorize('view', $shop);
 
-        $members = $shop->members()
+        $members = $shop->shopMembers()
             ->with('user')
             ->latest()
             ->paginate();
@@ -47,7 +46,7 @@ class ShopMemberController extends Controller
         $role = ShopMemberRole::from($request->input('role'));
         
         // Check if user is already a member
-        if ($shop->members()->where('user_id', $request->input('user_id'))->exists()) {
+        if ($shop->members()->wherePivot('user_id', $request->input('user_id'))->exists()) {
             return new JsonResponse([
                 'success' => false,
                 'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
@@ -55,11 +54,14 @@ class ShopMemberController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $member = $shop->members()->create([
-            'user_id' => $request->input('user_id'),
+        // Create the shop member association using attach
+        $shop->members()->attach($request->input('user_id'), [
+            'id' => Str::uuid()->toString(),
             'role' => $role->value,
             'permissions' => $request->input('permissions', $role->permissions()),
         ]);
+
+        $member = $shop->shopMembers()->where('user_id', $request->input('user_id'))->first(); 
 
         return new JsonResponse([
             'success' => true,
