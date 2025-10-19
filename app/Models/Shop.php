@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Shop extends Model
@@ -61,9 +62,22 @@ class Shop extends Model
         return $this->hasMany(ActiveShop::class);
     }
 
+     public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
+    }
+
+     /**
+     * Get the currently selected shop for the user.
+     */
+    public function activeShop(): HasOne
+    {
+        return $this->hasOne(ActiveShop::class)->latestOfMany('selected_at')->where('user_id', auth()->id());
     }
 
     public function scopeOnline($query)

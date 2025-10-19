@@ -14,7 +14,6 @@ class CategoryResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'productsCount' => $this->whenCounted('products'),
-            'shop' => new ShopResource($this->whenLoaded('shop')),
             'createdAt' => $this->created_at?->toIso8601String(),
             'updatedAt' => $this->updated_at?->toIso8601String(),
             'deletedAt' => $this->deleted_at?->toIso8601String(),

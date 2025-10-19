@@ -33,6 +33,7 @@ class ShopResource extends JsonResource
             ],
             'imageUrl' => $this->image_url,
             'isActive' => $this->is_active,
+            'isCurrentSelected' => $this->activeShop()->exists(),
             'owner' => new UserResource($this->whenLoaded('owner')),
             'members' => ShopMemberResource::collection($this->whenLoaded('members')),
             'membersCount' => $this->whenCounted('members'),

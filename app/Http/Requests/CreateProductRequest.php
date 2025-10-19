@@ -12,7 +12,7 @@ class CreateProductRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'product_name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'category_id' => ['nullable', 'uuid', 'exists:categories,id'],
             'purchase_quantity' => ['required', 'integer', 'min:1'],

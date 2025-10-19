@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Shop\CreateShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Http\Resources\ShopResource;
+use App\Models\Category;
 use App\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -130,7 +131,7 @@ class ShopController extends Controller
     public function switchShop(Shop $shop): JsonResponse
     {
         try {
-            $activeShop = auth()->user()->switchShop($shop);
+            auth()->user()->switchShop($shop);
 
             return new JsonResponse([
                 'success' => true,
@@ -174,6 +175,5 @@ class ShopController extends Controller
             ]
         ]);
     }
-
 
 }
