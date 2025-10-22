@@ -73,8 +73,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/seller', [PurchaseOrderController::class, 'indexAsSeller']);
 
             // CRUD operations
-            Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show']);
             Route::post('/', [PurchaseOrderController::class, 'store']);
+            Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show']);
             Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update']);
             Route::delete('/{purchaseOrder}', [PurchaseOrderController::class, 'destroy']);
 
