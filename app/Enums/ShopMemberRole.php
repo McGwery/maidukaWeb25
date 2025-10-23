@@ -34,6 +34,10 @@ enum ShopMemberRole: string
                 'view_reports',
                 'process_sales',
                 'manage_products',
+                'manage_purchases',
+                'approve_purchases',
+                'record_purchase_payments',
+                'transfer_stock',
             ],
             self::CASHIER => [
                 'process_sales',
@@ -49,6 +53,9 @@ enum ShopMemberRole: string
                 'view_inventory',
                 'manage_products',
                 'view_reports',
+                'manage_purchases',
+                'record_purchase_payments',
+                'transfer_stock',
             ],
             self::EMPLOYEE => [
                 'view_inventory',

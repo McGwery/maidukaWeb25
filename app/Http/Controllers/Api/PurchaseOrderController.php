@@ -31,10 +31,7 @@ class PurchaseOrderController extends Controller
      */
     public function indexAsBuyer(Request $request, Shop $shop): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
+        $this->authorize('viewAny', [PurchaseOrder::class, $shop]);
 
         $orders = PurchaseOrder::where('buyer_shop_id', $shop->id)
             ->with(['sellerShop', 'items.product', 'approvedBy'])
@@ -56,7 +53,7 @@ class PurchaseOrderController extends Controller
             ->latest()
             ->paginate($request->per_page ?? 15);
 
-         return new JsonResponse([
+        return new JsonResponse([
             'success' => true,
             'code' => Response::HTTP_OK,
             'data' => [
@@ -76,10 +73,7 @@ class PurchaseOrderController extends Controller
      */
     public function indexAsSeller(Request $request, Shop $shop): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
+        $this->authorize('viewAny', [PurchaseOrder::class, $shop]);
 
         $orders = PurchaseOrder::where('seller_shop_id', $shop->id)
             ->with(['buyerShop', 'items.product', 'approvedBy'])
@@ -121,10 +115,7 @@ class PurchaseOrderController extends Controller
      */
     public function store(CreatePurchaseOrderRequest $request, Shop $shop): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
+        $this->authorize('create', [PurchaseOrder::class, $shop]);
 
         // Verify seller shop exists and is active
         $sellerShop = Shop::where('id', $request->seller_shop_id)
@@ -142,10 +133,9 @@ class PurchaseOrderController extends Controller
         DB::beginTransaction();
         try {
             // Calculate total amount
-            $totalAmount = 0;
-            foreach ($request->items as $item) {
-                $totalAmount += $item['quantity'] * $item['unit_price'];
-            }
+            $totalAmount = collect($request->items)->sum(function ($item) {
+                return $item['quantity'] * $item['unit_price'];
+            });
 
             // Create purchase order
             $purchaseOrder = PurchaseOrder::create([
@@ -155,18 +145,11 @@ class PurchaseOrderController extends Controller
                 'total_amount' => $totalAmount,
                 'total_paid' => 0,
                 'notes' => $request->notes,
+                'is_internal' => $request->is_internal,
             ]);
 
             // Create purchase order items
-            foreach ($request->items as $item) {
-                PurchaseOrderItem::create([
-                    'purchase_order_id' => $purchaseOrder->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'notes' => $item['notes'] ?? null,
-                ]);
-            }
+            $purchaseOrder->items()->createMany($request->items);
 
             DB::commit();
 
@@ -183,7 +166,7 @@ class PurchaseOrderController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return new JsonResponse([
                 'success' => false,
                 'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
@@ -198,30 +181,13 @@ class PurchaseOrderController extends Controller
      */
     public function show(Request $request, Shop $shop, PurchaseOrder $purchaseOrder): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
+        $this->authorize('view', [$purchaseOrder, $shop]);
 
-        // Check if shop is involved in this purchase order
-        if ($purchaseOrder->buyer_shop_id !== $shop->id && 
-            $purchaseOrder->seller_shop_id !== $shop->id) {
-            return new JsonResponse([
-                'message' => 'Purchase order not found.'
-            ], Response::HTTP_NOT_FOUND);
-        }
-
-        $purchaseOrder->load([
-            'buyerShop',
-            'sellerShop',
-            'items.product',
-            'payments.recordedBy',
-            'stockTransfers.product',
-            'approvedBy'
-        ]);
+        $purchaseOrder->load(['buyerShop', 'sellerShop', 'items.product', 'payments', 'stockTransfers']);
 
         return new JsonResponse([
             'success' => true,
+            'code' => Response::HTTP_OK,
             'data' => [
                 'purchaseOrder' => new PurchaseOrderResource($purchaseOrder),
             ],
@@ -231,61 +197,33 @@ class PurchaseOrderController extends Controller
     /**
      * Update the specified purchase order.
      */
-    public function update(
-        UpdatePurchaseOrderRequest $request, 
-        Shop $shop, 
-        PurchaseOrder $purchaseOrder
-    ): JsonResponse {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
-
-        // Only buyer can update and only if pending
-        if ($purchaseOrder->buyer_shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Only the buyer shop can update this purchase order.',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        if ($purchaseOrder->status !== PurchaseOrderStatus::PENDING) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Only pending purchase orders can be updated.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+    public function update(UpdatePurchaseOrderRequest $request, Shop $shop, PurchaseOrder $purchaseOrder): JsonResponse
+    {
+        $this->authorize('update', [$purchaseOrder, $shop]);
 
         DB::beginTransaction();
         try {
-            // Update notes if provided
-            if ($request->has('notes')) {
-                $purchaseOrder->notes = $request->notes;
-            }
-
-            // Update items if provided
             if ($request->has('items')) {
                 // Delete existing items
                 $purchaseOrder->items()->delete();
 
-                // Calculate new total amount
-                $totalAmount = 0;
-                foreach ($request->items as $item) {
-                    $totalAmount += $item['quantity'] * $item['unit_price'];
-                    
-                    PurchaseOrderItem::create([
-                        'purchase_order_id' => $purchaseOrder->id,
-                        'product_id' => $item['product_id'],
-                        'quantity' => $item['quantity'],
-                        'unit_price' => $item['unit_price'],
-                        'notes' => $item['notes'] ?? null,
-                    ]);
-                }
+                // Create new items
+                $purchaseOrder->items()->createMany($request->items);
 
-                $purchaseOrder->total_amount = $totalAmount;
+                // Update total amount
+                $totalAmount = collect($request->items)->sum(function ($item) {
+                    return $item['quantity'] * $item['unit_price'];
+                });
+
+                $purchaseOrder->update([
+                    'total_amount' => $totalAmount,
+                    'notes' => $request->notes ?? $purchaseOrder->notes,
+                ]);
+            } else {
+                $purchaseOrder->update([
+                    'notes' => $request->notes,
+                ]);
             }
-
-            $purchaseOrder->save();
 
             DB::commit();
 
@@ -293,6 +231,7 @@ class PurchaseOrderController extends Controller
 
             return new JsonResponse([
                 'success' => true,
+                'code' => Response::HTTP_OK,
                 'message' => 'Purchase order updated successfully',
                 'data' => [
                     'purchaseOrder' => new PurchaseOrderResource($purchaseOrder),
@@ -301,7 +240,7 @@ class PurchaseOrderController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return new JsonResponse([
                 'success' => false,
                 'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
@@ -319,76 +258,61 @@ class PurchaseOrderController extends Controller
         Shop $shop,
         PurchaseOrder $purchaseOrder
     ): JsonResponse {
-        // Verify user has access to this shop
-        if (!$shop->hasAccess($request->user())) {
-            abort(403, 'You do not have access to this shop.');
-        }
+        $this->authorize('approve', [$purchaseOrder, $shop]);
 
-        $newStatus = PurchaseOrderStatus::from($request->status);
-
-        // Validate status transition
-        if (!$purchaseOrder->status->canTransitionTo($newStatus)) {
+        if ($request->status === PurchaseOrderStatus::APPROVED && !$purchaseOrder->canBeApproved()) {
             return new JsonResponse([
                 'success' => false,
-                'message' => "Cannot transition from {$purchaseOrder->status->label()} to {$newStatus->label()}.",
+                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                'message' => 'Purchase order cannot be approved.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Only seller can approve/reject
-        if (in_array($newStatus, [PurchaseOrderStatus::APPROVED, PurchaseOrderStatus::REJECTED])) {
-            if ($purchaseOrder->seller_shop_id !== $shop->id) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Only the seller shop can approve or reject this purchase order.',
-                ], Response::HTTP_FORBIDDEN);
-            }
+        if ($request->status === PurchaseOrderStatus::COMPLETED && !$purchaseOrder->canBeCompleted()) {
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                'message' => 'Purchase order cannot be completed.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Both parties can cancel
-        if ($newStatus === PurchaseOrderStatus::CANCELLED) {
-            if ($purchaseOrder->buyer_shop_id !== $shop->id && 
-                $purchaseOrder->seller_shop_id !== $shop->id) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'You cannot cancel this purchase order.',
-                ], Response::HTTP_FORBIDDEN);
-            }
+        if ($request->status === PurchaseOrderStatus::CANCELLED && !$purchaseOrder->canBeCancelled()) {
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                'message' => 'Purchase order cannot be cancelled.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Only buyer can mark as completed
-        if ($newStatus === PurchaseOrderStatus::COMPLETED) {
-            if ($purchaseOrder->buyer_shop_id !== $shop->id) {
-                return new JsonResponse([
-                    'success' => false,
-                    'message' => 'Only the buyer shop can complete this purchase order.',
-                ], Response::HTTP_FORBIDDEN);
-            }
+        DB::beginTransaction();
+        try {
+            $purchaseOrder->update([
+                'status' => $request->status,
+                'approved_at' => $request->status === PurchaseOrderStatus::APPROVED ? now() : null,
+                'approved_by' => $request->status === PurchaseOrderStatus::APPROVED ? auth()->id() : null,
+            ]);
+
+            DB::commit();
+
+            return new JsonResponse([
+                'success' => true,
+                'code' => Response::HTTP_OK,
+                'message' => 'Purchase order status updated successfully',
+                'data' => [
+                    'purchaseOrder' => new PurchaseOrderResource($purchaseOrder),
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return new JsonResponse([
+                'success' => false,
+                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
+                'message' => 'Failed to update purchase order status',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        $purchaseOrder->status = $newStatus;
-        
-        if ($newStatus === PurchaseOrderStatus::APPROVED) {
-            $purchaseOrder->approved_at = now();
-            $purchaseOrder->approved_by = $request->user()->id;
-        }
-
-        if ($request->notes) {
-            $purchaseOrder->notes = $purchaseOrder->notes 
-                ? $purchaseOrder->notes . "\n\n" . $request->notes 
-                : $request->notes;
-        }
-
-        $purchaseOrder->save();
-
-        $purchaseOrder->load(['buyerShop', 'sellerShop', 'approvedBy']);
-
-        return new JsonResponse([
-            'success' => true,
-            'message' => "Purchase order {$newStatus->label()} successfully",
-            'data' => [
-                'purchaseOrder' => new PurchaseOrderResource($purchaseOrder),
-            ],
-        ]);
     }
 
     /**
@@ -399,38 +323,7 @@ class PurchaseOrderController extends Controller
         Shop $shop,
         PurchaseOrder $purchaseOrder
     ): JsonResponse {
-        // Verify user has access to this shop
-        if (!$shop->hasAccess($request->user())) {
-            abort(403, 'You do not have access to this shop.');
-        }
-
-        // Only buyer can record payments
-        if ($purchaseOrder->buyer_shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Only the buyer shop can record payments.',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        // Check if order is approved
-        if (!in_array($purchaseOrder->status, [
-            PurchaseOrderStatus::APPROVED,
-            PurchaseOrderStatus::COMPLETED
-        ])) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Can only record payments for approved purchase orders.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Check if payment exceeds remaining balance
-        $remainingBalance = $purchaseOrder->remaining_balance;
-        if ($request->amount > $remainingBalance) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => "Payment amount cannot exceed remaining balance of {$remainingBalance}.",
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+        $this->authorize('recordPayment', [$purchaseOrder, $shop]);
 
         DB::beginTransaction();
         try {
@@ -440,16 +333,11 @@ class PurchaseOrderController extends Controller
                 'payment_method' => $request->payment_method,
                 'reference_number' => $request->reference_number,
                 'notes' => $request->notes,
-                'recorded_by' => $request->user()->id,
             ]);
 
-            // Update total paid
-            $purchaseOrder->total_paid += $request->amount;
-            $purchaseOrder->save();
+            $purchaseOrder->increment('total_paid', $request->amount);
 
             DB::commit();
-
-            $payment->load('recordedBy');
 
             return new JsonResponse([
                 'success' => true,
@@ -457,17 +345,12 @@ class PurchaseOrderController extends Controller
                 'message' => 'Payment recorded successfully',
                 'data' => [
                     'payment' => new PurchasePaymentResource($payment),
-                    'purchaseOrder' => [
-                        'totalPaid' => $purchaseOrder->total_paid,
-                        'remainingBalance' => $purchaseOrder->remaining_balance,
-                        'isFullyPaid' => $purchaseOrder->isFullyPaid(),
-                    ],
                 ],
             ], Response::HTTP_CREATED);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return new JsonResponse([
                 'success' => false,
                 'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
@@ -485,92 +368,35 @@ class PurchaseOrderController extends Controller
         Shop $shop,
         PurchaseOrder $purchaseOrder
     ): JsonResponse {
-        // Verify user has access to this shop
-        if (!$shop->hasAccess($request->user())) {
-            abort(403, 'You do not have access to this shop.');
-        }
-
-        // Only seller can transfer stock
-        if ($purchaseOrder->seller_shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Only the seller shop can transfer stock.',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        // Check if order is approved
-        if ($purchaseOrder->status !== PurchaseOrderStatus::APPROVED) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Can only transfer stock for approved purchase orders.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+        $this->authorize('transferStock', [$purchaseOrder, $shop]);
 
         DB::beginTransaction();
         try {
-            $transfers = [];
+            $stockTransfer = StockTransfer::create([
+                'purchase_order_id' => $purchaseOrder->id,
+                'product_id' => $request->product_id,
+                'quantity' => $request->quantity,
+                'notes' => $request->notes,
+            ]);
 
-            foreach ($request->items as $item) {
-                $product = Product::findOrFail($item['product_id']);
-
-                // Verify product belongs to seller shop
-                if ($product->shop_id !== $shop->id) {
-                    throw new \Exception("Product {$product->product_name} does not belong to your shop.");
-                }
-
-                // Check if seller has enough stock
-                if ($product->current_stock < $item['quantity']) {
-                    throw new \Exception("Insufficient stock for product {$product->product_name}. Available: {$product->current_stock}, Requested: {$item['quantity']}");
-                }
-
-                // Reduce seller's stock
-                $product->current_stock -= $item['quantity'];
-                $product->save();
-
-                // Create or update product in buyer's shop
-                $buyerProduct = Product::where('shop_id', $purchaseOrder->buyer_shop_id)
-                    ->where('product_name', $product->product_name)
-                    ->where('sku', $product->sku)
-                    ->first();
-
-                if ($buyerProduct) {
-                    // Update existing product
-                    $buyerProduct->current_stock += $item['quantity'];
-                    $buyerProduct->save();
-                } else {
-                    // Create new product in buyer's shop
-                    $newProduct = $product->replicate();
-                    $newProduct->shop_id = $purchaseOrder->buyer_shop_id;
-                    $newProduct->current_stock = $item['quantity'];
-                    $newProduct->save();
-                }
-
-                // Record stock transfer
-                $transfer = StockTransfer::create([
-                    'purchase_order_id' => $purchaseOrder->id,
-                    'product_id' => $product->id,
-                    'quantity' => $item['quantity'],
-                    'transferred_at' => now(),
-                    'transferred_by' => $request->user()->id,
-                    'notes' => $item['notes'] ?? null,
-                ]);
-
-                $transfers[] = $transfer;
-            }
+            // Update product stock
+            $product = Product::findOrFail($request->product_id);
+            $product->increment('stock_quantity', $request->quantity);
 
             DB::commit();
 
             return new JsonResponse([
                 'success' => true,
+                'code' => Response::HTTP_CREATED,
                 'message' => 'Stock transferred successfully',
                 'data' => [
-                    'transfers' => StockTransferResource::collection(collect($transfers)->load(['product', 'transferredBy'])),
+                    'stockTransfer' => new StockTransferResource($stockTransfer),
                 ],
-            ]);
+            ], Response::HTTP_CREATED);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return new JsonResponse([
                 'success' => false,
                 'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
@@ -578,38 +404,5 @@ class PurchaseOrderController extends Controller
                 'error' => $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    /**
-     * Delete a purchase order.
-     */
-    public function destroy(Request $request, Shop $shop, PurchaseOrder $purchaseOrder): JsonResponse
-    {
-        // Verify user has access to this shop
-        if (!$shop->hasAccess($request->user())) {
-            abort(403, 'You do not have access to this shop.');
-        }
-
-        // Only buyer can delete and only if pending
-        if ($purchaseOrder->buyer_shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Only the buyer shop can delete this purchase order.',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        if ($purchaseOrder->status !== PurchaseOrderStatus::PENDING) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Only pending purchase orders can be deleted.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $purchaseOrder->delete();
-
-        return new JsonResponse([
-            'success' => true,
-            'message' => 'Purchase order deleted successfully',
-        ]);
     }
 }

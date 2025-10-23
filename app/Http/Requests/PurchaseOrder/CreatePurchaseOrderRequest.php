@@ -23,8 +23,9 @@ class CreatePurchaseOrderRequest extends FormRequest
                 'different:buyer_shop_id',
                 function ($attribute, $value, $fail) {
                     if (!$this->is_internal && $value) {
-                        $buyerShop = $this->user()->currentShop;
-                        $hasRelationship = $buyerShop->suppliers()->where('id', $value)->exists();
+                        $buyerShop = $this->user()->activeShop->shop;
+
+                        $hasRelationship = $buyerShop->suppliers()->where('supplier_id', $value)->exists();
 
                         if (!$hasRelationship) {
                             $fail('The selected seller must be an existing supplier in your shop.');
@@ -39,14 +40,13 @@ class CreatePurchaseOrderRequest extends FormRequest
                 'uuid',
                 'exists:products,id',
                 function ($attribute, $value, $fail) {
-                    $buyerShop = $this->user()->currentShop;
+                    $buyerShop = $this->user()->activeShop;
 
                     // For internal purchases, validate that products belong to buyer's shop
                     if ($this->is_internal) {
                         $exists = Product::where('id', $value)
-                            ->where('shop_id', $buyerShop->id)
+                            ->where('shop_id', $buyerShop->shop_id)
                             ->exists();
-
                         if (!$exists) {
                             $fail('For internal purchases, products must belong to your shop.');
                         }
@@ -81,7 +81,7 @@ class CreatePurchaseOrderRequest extends FormRequest
     {
         if ($this->is_internal) {
             $this->merge([
-                'seller_shop_id' => $this->user()->currentShop->id,
+                'seller_shop_id' => $this->user()->activeShop->shop_id,
             ]);
         }
     }
