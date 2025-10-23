@@ -94,4 +94,16 @@ class Shop extends Model
     {
         return $this->members()->wherePivot('user_id', $user->id)->exists();
     }
+
+    public function suppliers(): BelongsToMany
+    {
+        return $this->belongsToMany(Shop::class, 'shop_suppliers', 'shop_id', 'supplier_id')
+            ->withTimestamps();
+    }
+
+   public function clientShops(): BelongsToMany
+   {
+       return $this->belongsToMany(Shop::class, 'shop_suppliers', 'supplier_id', 'shop_id')
+           ->withTimestamps();
+   }
 }

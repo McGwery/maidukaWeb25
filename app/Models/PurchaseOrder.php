@@ -23,6 +23,7 @@ class PurchaseOrder extends Model
         'notes',
         'approved_at',
         'approved_by',
+        'is_internal',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class PurchaseOrder extends Model
         'total_amount' => 'decimal:2',
         'total_paid' => 'decimal:2',
         'approved_at' => 'datetime',
+        'is_internal' => 'boolean',
     ];
 
     protected static function boot()
@@ -48,7 +50,7 @@ class PurchaseOrder extends Model
         $prefix = 'PO';
         $date = now()->format('Ymd');
         $random = strtoupper(substr(uniqid(), -4));
-        
+
         return "{$prefix}-{$date}-{$random}";
     }
 
