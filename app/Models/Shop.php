@@ -77,6 +77,11 @@ class Shop extends Model
         return $this->hasMany(Customer::class);
     }
 
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

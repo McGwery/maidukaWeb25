@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\Auth\PhoneAuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\POSController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseOrderController;
 use App\Http\Controllers\Api\ShopController;
@@ -98,27 +100,38 @@ Route::middleware('auth:sanctum')->group(function () {
         // POS - Sales Management
         Route::group(['prefix' => '{shop}/pos'], function () {
             // Complete sale
-            Route::post('/sales', [\App\Http\Controllers\Api\POSController::class, 'completeSale']);
+            Route::post('/sales', [POSController::class, 'completeSale']);
 
             // Sales history and details
-            Route::get('/sales', [\App\Http\Controllers\Api\POSController::class, 'getSales']);
-            Route::get('/sales/{sale}', [\App\Http\Controllers\Api\POSController::class, 'getSale']);
+            Route::get('/sales', [POSController::class, 'getSales']);
+            Route::get('/sales/{sale}', [POSController::class, 'getSale']);
 
             // Sales analytics
-            Route::get('/analytics', [\App\Http\Controllers\Api\POSController::class, 'getSalesAnalytics']);
+            Route::get('/analytics', [POSController::class, 'getSalesAnalytics']);
 
             // Refund and payments
-            Route::post('/sales/{sale}/refund', [\App\Http\Controllers\Api\POSController::class, 'refundSale']);
-            Route::post('/sales/{sale}/payments', [\App\Http\Controllers\Api\POSController::class, 'addPayment']);
+            Route::post('/sales/{sale}/refund', [POSController::class, 'refundSale']);
+            Route::post('/sales/{sale}/payments', [POSController::class, 'addPayment']);
         });
 
         // Customer Management
         Route::group(['prefix' => '{shop}/customers'], function () {
-            Route::get('/', [\App\Http\Controllers\Api\POSController::class, 'getCustomers']);
-            Route::post('/', [\App\Http\Controllers\Api\POSController::class, 'createCustomer']);
-            Route::get('/{customer}', [\App\Http\Controllers\Api\POSController::class, 'getCustomer']);
-            Route::put('/{customer}', [\App\Http\Controllers\Api\POSController::class, 'updateCustomer']);
-            Route::delete('/{customer}', [\App\Http\Controllers\Api\POSController::class, 'deleteCustomer']);
+            Route::get('/', [POSController::class, 'getCustomers']);
+            Route::post('/', [POSController::class, 'createCustomer']);
+            Route::get('/{customer}', [POSController::class, 'getCustomer']);
+            Route::put('/{customer}', [POSController::class, 'updateCustomer']);
+            Route::delete('/{customer}', [POSController::class, 'deleteCustomer']);
+        });
+
+        // Expense Management
+        Route::group(['prefix' => '{shop}/expenses'], function () {
+            Route::get('/', [ExpenseController::class, 'index']);
+            Route::post('/', [ExpenseController::class, 'store']);
+            Route::get('/summary', [ExpenseController::class, 'summary']);
+            Route::get('/categories', [ExpenseController::class, 'categories']);
+            Route::get('/{expense}', [ExpenseController::class, 'show']);
+            Route::put('/{expense}', [ExpenseController::class, 'update']);
+            Route::delete('/{expense}', [ExpenseController::class, 'destroy']);
         });
 
     });
