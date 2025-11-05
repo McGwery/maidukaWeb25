@@ -95,5 +95,31 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{purchaseOrder}/transfer-stock', [PurchaseOrderController::class, 'transferStock']);
         });
 
+        // POS - Sales Management
+        Route::group(['prefix' => '{shop}/pos'], function () {
+            // Complete sale
+            Route::post('/sales', [\App\Http\Controllers\Api\POSController::class, 'completeSale']);
+
+            // Sales history and details
+            Route::get('/sales', [\App\Http\Controllers\Api\POSController::class, 'getSales']);
+            Route::get('/sales/{sale}', [\App\Http\Controllers\Api\POSController::class, 'getSale']);
+
+            // Sales analytics
+            Route::get('/analytics', [\App\Http\Controllers\Api\POSController::class, 'getSalesAnalytics']);
+
+            // Refund and payments
+            Route::post('/sales/{sale}/refund', [\App\Http\Controllers\Api\POSController::class, 'refundSale']);
+            Route::post('/sales/{sale}/payments', [\App\Http\Controllers\Api\POSController::class, 'addPayment']);
+        });
+
+        // Customer Management
+        Route::group(['prefix' => '{shop}/customers'], function () {
+            Route::get('/', [\App\Http\Controllers\Api\POSController::class, 'getCustomers']);
+            Route::post('/', [\App\Http\Controllers\Api\POSController::class, 'createCustomer']);
+            Route::get('/{customer}', [\App\Http\Controllers\Api\POSController::class, 'getCustomer']);
+            Route::put('/{customer}', [\App\Http\Controllers\Api\POSController::class, 'updateCustomer']);
+            Route::delete('/{customer}', [\App\Http\Controllers\Api\POSController::class, 'deleteCustomer']);
+        });
+
     });
 });
