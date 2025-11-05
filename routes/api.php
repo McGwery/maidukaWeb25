@@ -61,8 +61,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/{product}', [ProductController::class, 'show']);
             Route::put('/{product}', [ProductController::class, 'update']);
             Route::delete('/{product}', [ProductController::class, 'destroy']);
+
+            // Stock adjustment
             Route::patch('/{product}/stock', [ProductController::class, 'updateStock']);
+            Route::get('/{product}/adjustments', [ProductController::class, 'stockAdjustmentHistory']);
         });
+
+        // Inventory Analysis
+        Route::get('/{shop}/inventory/analysis', [ProductController::class, 'inventoryAnalysis']);
+        Route::get('/{shop}/inventory/adjustments', [ProductController::class, 'adjustmentsSummary']);
 
         // Purchase Order Management
         Route::group(['prefix' => '{shop}/purchase-orders'], function () {

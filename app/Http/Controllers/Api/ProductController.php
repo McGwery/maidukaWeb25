@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\StockAdjustmentType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateProductRequest;
+use App\Http\Requests\StockAdjustmentRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
+use App\Http\Resources\StockAdjustmentResource;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\StockAdjustment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -49,9 +53,9 @@ class ProductController extends Controller
                 'products' => ProductResource::collection($products),
                 'pagination' => [
                     'total' => $products->total(),
-                    'current_page' => $products->currentPage(),
-                    'last_page' => $products->lastPage(),
-                    'per_page' => $products->perPage(),
+                    'currentPage' => $products->currentPage(),
+                    'lastPage' => $products->lastPage(),
+                    'perPage' => $products->perPage(),
                 ]
             ]
         ]);
@@ -101,15 +105,15 @@ class ProductController extends Controller
             'data' => [
                 'product' => new ProductResource($product),
                 'computed' => [
-                    'suggested_low_stock_threshold' => ceil($data['purchase_quantity'] * 0.2),
-                    'suggested_price_per_item' => $data['sell_individual_items'] && isset($data['break_down_count_per_unit'])
+                    'suggestedLowStockThreshold' => ceil($data['purchase_quantity'] * 0.2),
+                    'suggestedPricePerItem' => $data['sell_individual_items'] && isset($data['break_down_count_per_unit'])
                         ? round($data['total_amount_paid'] / ($data['purchase_quantity'] * $data['break_down_count_per_unit']), 2)
                         : null,
-                    'total_individual_items' => $data['sell_individual_items'] && isset($data['break_down_count_per_unit'])
+                    'totalIndividualItems' => $data['sell_individual_items'] && isset($data['break_down_count_per_unit'])
                         ? ($data['purchase_quantity'] * $data['break_down_count_per_unit'])
                         : null,
-                    'cost_per_unit' => $data['cost_per_unit'],
-                    'profit_margin_per_unit' => isset($data['price_per_unit'])
+                    'costPerUnit' => $data['cost_per_unit'],
+                    'profitMarginPerUnit' => isset($data['price_per_unit'])
                         ? round((($data['price_per_unit'] - $data['cost_per_unit']) / $data['cost_per_unit']) * 100, 2)
                         : null,
                 ]
@@ -142,10 +146,10 @@ class ProductController extends Controller
             'data' => [
                 'product' => new ProductResource($product),
                 'computed' => [
-                    'profit_margin_per_unit' => $product->price_per_unit
+                    'profitMarginPerUnit' => $product->price_per_unit
                         ? round((($product->price_per_unit - $product->cost_per_unit) / $product->cost_per_unit) * 100, 2)
                         : null,
-                    'total_individual_items' => $product->sell_individual_items && $product->break_down_count_per_unit
+                    'totalIndividualItems' => $product->sell_individual_items && $product->break_down_count_per_unit
                         ? ($product->current_stock * $product->break_down_count_per_unit)
                         : null,
                 ]
@@ -210,15 +214,15 @@ class ProductController extends Controller
             'data' => [
                 'product' => new ProductResource($product),
                 'computed' => [
-                    'suggested_low_stock_threshold' => ceil($product->purchase_quantity * 0.2),
-                    'suggested_price_per_item' => $product->sell_individual_items && $product->break_down_count_per_unit
+                    'suggestedLowStockThreshold' => ceil($product->purchase_quantity * 0.2),
+                    'suggestedPricePerItem' => $product->sell_individual_items && $product->break_down_count_per_unit
                         ? round($product->total_amount_paid / ($product->purchase_quantity * $product->break_down_count_per_unit), 2)
                         : null,
-                    'total_individual_items' => $product->sell_individual_items && $product->break_down_count_per_unit
+                    'totalIndividualItems' => $product->sell_individual_items && $product->break_down_count_per_unit
                         ? ($product->current_stock * $product->break_down_count_per_unit)
                         : null,
-                    'cost_per_unit' => $product->cost_per_unit,
-                    'profit_margin_per_unit' => $product->price_per_unit
+                    'costPerUnit' => $product->cost_per_unit,
+                    'profitMarginPerUnit' => $product->price_per_unit
                         ? round((($product->price_per_unit - $product->cost_per_unit) / $product->cost_per_unit) * 100, 2)
                         : null,
                 ]
@@ -254,56 +258,243 @@ class ProductController extends Controller
     }
 
     /**
-     * Update product stock.
+     * Update product stock with tracking.
      */
-    public function updateStock(Request $request, Shop $shop, Product $product): JsonResponse
+    public function updateStock(StockAdjustmentRequest $request, Shop $shop, Product $product): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
-
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
-                'code' => Response::HTTP_NO_CONTENT,
                 'message' => 'Product not found in this shop.'
             ], Response::HTTP_NOT_FOUND);
         }
 
-        $request->validate([
-            'adjustment' => 'required|integer|not_in:0',
-            'reason' => 'required|string|max:255'
-        ]);
-
         $oldStock = $product->current_stock;
-        $newStock = $oldStock + $request->adjustment;
+        $quantity = $request->quantity;
+        $newStock = $oldStock + $quantity;
 
         if ($newStock < 0) {
             return new JsonResponse([
-                'message' => 'Stock cannot be reduced below zero'
+                'success' => false,
+                'message' => 'Stock cannot be reduced below zero. Current stock: ' . $oldStock
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Create stock adjustment record
+        $adjustment = StockAdjustment::create([
+            'product_id' => $product->id,
+            'user_id' => $request->user()->id,
+            'type' => $request->type,
+            'quantity' => $quantity,
+            'value_at_time' => $product->cost_per_unit,
+            'previous_stock' => $oldStock,
+            'new_stock' => $newStock,
+            'reason' => $request->reason,
+            'notes' => $request->notes,
+        ]);
+
+        // Update product stock
         $product->update([
             'current_stock' => $newStock
         ]);
 
-        // TODO: You might want to log this stock adjustment in a separate table
-        // StockAdjustment::create([...]);
+        return new JsonResponse([
+            'success' => true,
+            'message' => 'Stock adjusted successfully',
+            'code' => Response::HTTP_OK,
+            'data' => [
+                'product' => new ProductResource($product->fresh()),
+                'adjustment' => new StockAdjustmentResource($adjustment),
+            ]
+        ]);
+    }
+
+    /**
+     * Get stock adjustment history for a product.
+     */
+    public function stockAdjustmentHistory(Request $request, Shop $shop, Product $product): JsonResponse
+    {
+        // Check if product belongs to this shop
+        if ($product->shop_id !== $shop->id) {
+            return new JsonResponse([
+                'success' => false,
+                'message' => 'Product not found in this shop.'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $adjustments = $product->stockAdjustments()
+            ->with(['user'])
+            ->when($request->type, function ($query, $type) {
+                $query->where('type', $type);
+            })
+            ->when($request->from_date, function ($query, $fromDate) {
+                $query->whereDate('created_at', '>=', $fromDate);
+            })
+            ->when($request->to_date, function ($query, $toDate) {
+                $query->whereDate('created_at', '<=', $toDate);
+            })
+            ->latest()
+            ->paginate($request->per_page ?? 15);
+
+        $totalLosses = $product->stockAdjustments()
+            ->whereIn('type', [
+                StockAdjustmentType::DAMAGED->value,
+                StockAdjustmentType::EXPIRED->value,
+                StockAdjustmentType::LOST->value,
+                StockAdjustmentType::THEFT->value,
+            ])
+            ->get()
+            ->sum(fn($adj) => $adj->getMonetaryImpact());
 
         return new JsonResponse([
             'success' => true,
-            'message' => 'Stock updated successfully',
-            'code' => Response::HTTP_NO_CONTENT,
+            'code' => Response::HTTP_OK,
             'data' => [
-                'product' => new ProductResource($product),
-                'stock_change' => [
-                    'old_stock' => $oldStock,
-                    'adjustment' => $request->adjustment,
-                    'new_stock' => $newStock,
-                    'reason' => $request->reason
+                'adjustments' => StockAdjustmentResource::collection($adjustments),
+                'summary' => [
+                    'totalReductions' => $product->stockAdjustments()->where('quantity', '<', 0)->sum('quantity'),
+                    'totalAdditions' => $product->stockAdjustments()->where('quantity', '>', 0)->sum('quantity'),
+                    'totalLossesValue' => $totalLosses,
+                ],
+                'pagination' => [
+                    'total' => $adjustments->total(),
+                    'currentPage' => $adjustments->currentPage(),
+                    'lastPage' => $adjustments->lastPage(),
+                    'perPage' => $adjustments->perPage(),
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * Get inventory value and profit analysis for shop.
+     */
+    public function inventoryAnalysis(Request $request, Shop $shop): JsonResponse
+    {
+        $products = $shop->products()
+            ->with(['stockAdjustments' => function ($query) {
+                $query->whereIn('type', [
+                    StockAdjustmentType::DAMAGED->value,
+                    StockAdjustmentType::EXPIRED->value,
+                    StockAdjustmentType::LOST->value,
+                    StockAdjustmentType::THEFT->value,
+                ]);
+            }])
+            ->where('current_stock', '>', 0)
+            ->get();
+
+        $totalInventoryValue = 0;
+        $totalExpectedRevenue = 0;
+        $totalExpectedProfit = 0;
+        $totalLosses = 0;
+        $productAnalysis = [];
+
+        foreach ($products as $product) {
+            $inventoryValue = $product->getInventoryValue();
+            $expectedRevenue = $product->getExpectedRevenue();
+            $expectedProfit = $product->getExpectedProfit();
+            $losses = $product->getTotalLosses();
+
+            $totalInventoryValue += $inventoryValue;
+            $totalExpectedRevenue += $expectedRevenue;
+            $totalExpectedProfit += $expectedProfit;
+            $totalLosses += $losses;
+
+            if ($request->include_products) {
+                $productAnalysis[] = [
+                    'productId' => $product->id,
+                    'productName' => $product->product_name,
+                    'currentStock' => $product->current_stock,
+                    'costPerUnit' => $product->cost_per_unit,
+                    'inventoryValue' => round($inventoryValue, 2),
+                    'expectedRevenue' => round($expectedRevenue, 2),
+                    'expectedProfit' => round($expectedProfit, 2),
+                    'expectedProfitMargin' => round($product->getExpectedProfitMargin(), 2),
+                    'totalLosses' => round($losses, 2),
+                ];
+            }
+        }
+
+        $profitMarginPercentage = $totalInventoryValue > 0
+            ? ($totalExpectedProfit / $totalInventoryValue) * 100
+            : 0;
+
+        return new JsonResponse([
+            'success' => true,
+            'code' => Response::HTTP_OK,
+            'data' => [
+                'summary' => [
+                    'totalInventoryValue' => round($totalInventoryValue, 2),
+                    'totalExpectedRevenue' => round($totalExpectedRevenue, 2),
+                    'totalExpectedProfit' => round($totalExpectedProfit, 2),
+                    'overallProfitMarginPercentage' => round($profitMarginPercentage, 2),
+                    'totalLosses' => round($totalLosses, 2),
+                    'netExpectedProfit' => round($totalExpectedProfit - $totalLosses, 2),
+                    'productsCount' => $products->count(),
+                    'lowStockCount' => $products->filter(fn($p) => $p->isLowStock())->count(),
+                ],
+                'products' => $request->include_products ? $productAnalysis : null,
+            ]
+        ]);
+    }
+
+    /**
+     * Get shop-wide stock adjustment summary.
+     */
+    public function adjustmentsSummary(Request $request, Shop $shop): JsonResponse
+    {
+        $query = StockAdjustment::query()
+            ->whereHas('product', function ($q) use ($shop) {
+                $q->where('shop_id', $shop->id);
+            })
+            ->with(['product', 'user']);
+
+        // Apply date filters
+        if ($request->from_date) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+        if ($request->to_date) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        $adjustments = $query->latest()->paginate($request->per_page ?? 15);
+
+        // Get summary by type
+        $summaryByType = [];
+        foreach (StockAdjustmentType::cases() as $type) {
+            $typeAdjustments = StockAdjustment::query()
+                ->whereHas('product', function ($q) use ($shop) {
+                    $q->where('shop_id', $shop->id);
+                })
+                ->where('type', $type->value)
+                ->when($request->from_date, function ($q, $date) {
+                    $q->whereDate('created_at', '>=', $date);
+                })
+                ->when($request->to_date, function ($q, $date) {
+                    $q->whereDate('created_at', '<=', $date);
+                })
+                ->get();
+
+            $summaryByType[$type->value] = [
+                'label' => $type->label(),
+                'count' => $typeAdjustments->count(),
+                'totalQuantity' => $typeAdjustments->sum('quantity'),
+                'totalValue' => round($typeAdjustments->sum(fn($adj) => $adj->getMonetaryImpact()), 2),
+            ];
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'code' => Response::HTTP_OK,
+            'data' => [
+                'adjustments' => StockAdjustmentResource::collection($adjustments),
+                'summaryByType' => $summaryByType,
+                'pagination' => [
+                    'total' => $adjustments->total(),
+                    'currentPage' => $adjustments->currentPage(),
+                    'lastPage' => $adjustments->lastPage(),
+                    'perPage' => $adjustments->perPage(),
                 ]
             ]
         ]);
