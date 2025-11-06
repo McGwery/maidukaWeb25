@@ -23,6 +23,7 @@ class Expense extends Model
         'receipt_number',
         'attachment_url',
         'recorded_by',
+        'sale_id',
     ];
 
     protected $casts = [
@@ -40,6 +41,11 @@ class Expense extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function sale(): BelongsTo
+    {
+        return $this->belongsTo(Sale::class);
     }
 }
 

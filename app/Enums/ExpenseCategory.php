@@ -13,6 +13,7 @@ enum ExpenseCategory: string
     case SUPPLIES = 'supplies';
     case INSURANCE = 'insurance';
     case TAXES = 'taxes';
+    case BAD_DEBT = 'bad_debt';
     case OTHER = 'other';
 
     public function label(): string
@@ -27,6 +28,7 @@ enum ExpenseCategory: string
             self::SUPPLIES => 'Supplies',
             self::INSURANCE => 'Insurance',
             self::TAXES => 'Taxes',
+            self::BAD_DEBT => 'Bad Debt',
             self::OTHER => 'Other',
         };
     }

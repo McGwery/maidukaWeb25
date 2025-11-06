@@ -32,6 +32,7 @@ class Sale extends Model
         'payment_status',
         'notes',
         'sale_date',
+        'converted_to_expense_at',
     ];
 
     protected $casts = [
@@ -47,6 +48,7 @@ class Sale extends Model
         'profit_amount' => 'decimal:2',
         'status' => SaleStatus::class,
         'sale_date' => 'datetime',
+        'converted_to_expense_at' => 'datetime',
     ];
 
     protected static function boot()

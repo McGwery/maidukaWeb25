@@ -12,6 +12,7 @@ class ExpenseResource extends JsonResource
         return [
             'id' => $this->id,
             'shopId' => $this->shop_id,
+            'saleId' => $this->sale_id,
             'title' => $this->title,
             'description' => $this->description,
             'category' => [
@@ -20,16 +21,16 @@ class ExpenseResource extends JsonResource
             ],
             'amount' => $this->amount,
             'expenseDate' => $this->expense_date->format('Y-m-d'),
-            'paymentMethod' => [
+            'paymentMethod' => $this->payment_method ? [
                 'value' => $this->payment_method->value,
                 'label' => $this->payment_method->label(),
-            ],
+            ] : null,
             'receiptNumber' => $this->receipt_number,
             'attachmentUrl' => $this->attachment_url,
-            'recordedBy' => [
+            'recordedBy' => $this->recordedBy ? [
                 'id' => $this->recordedBy->id,
                 'name' => $this->recordedBy->name,
-            ],
+            ] : null,
             'createdAt' => $this->created_at?->toIso8601String(),
             'updatedAt' => $this->updated_at?->toIso8601String(),
         ];

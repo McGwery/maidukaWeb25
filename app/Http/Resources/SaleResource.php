@@ -33,6 +33,7 @@ class SaleResource extends JsonResource
             'paymentStatus' => $this->payment_status,
             'notes' => $this->notes,
             'saleDate' => $this->sale_date,
+            'convertedToExpenseAt' => $this->converted_to_expense_at,
             'items' => $this->whenLoaded('items', fn() => SaleItemResource::collection($this->items)),
             'payments' => $this->whenLoaded('payments', fn() => SalePaymentResource::collection($this->payments)),
             'itemsCount' => $this->items_count ?? $this->items()->count(),
