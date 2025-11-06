@@ -20,3 +20,9 @@ Schedule::command('customers:send-debt-reminders')
     ->onOneServer()
     ->withoutOverlapping();
 
+// Schedule: Process daily savings from profits (runs daily at 3 AM)
+Schedule::command('savings:process-daily')
+    ->dailyAt('03:00')
+    ->onOneServer()
+    ->withoutOverlapping();
+

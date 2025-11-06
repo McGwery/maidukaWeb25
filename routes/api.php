@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\POSController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseOrderController;
 use App\Http\Controllers\Api\ReportsController;
+use App\Http\Controllers\Api\SavingsController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\ShopMemberController;
 use Illuminate\Support\Facades\Route;
@@ -142,6 +143,25 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/products', [ReportsController::class, 'productsReport']);
             Route::get('/financial', [ReportsController::class, 'financialReport']);
             Route::get('/employees', [ReportsController::class, 'employeesReport']);
+        });
+
+        // Savings & Goals Management
+        Route::group(['prefix' => '{shop}/savings'], function () {
+            // Settings
+            Route::get('/settings', [SavingsController::class, 'getSettings']);
+            Route::put('/settings', [SavingsController::class, 'updateSettings']);
+
+            // Transactions
+            Route::post('/deposit', [SavingsController::class, 'deposit']);
+            Route::post('/withdraw', [SavingsController::class, 'withdraw']);
+            Route::get('/transactions', [SavingsController::class, 'getTransactions']);
+            Route::get('/summary', [SavingsController::class, 'getSummary']);
+
+            // Goals
+            Route::get('/goals', [SavingsController::class, 'getGoals']);
+            Route::post('/goals', [SavingsController::class, 'createGoal']);
+            Route::put('/goals/{goal}', [SavingsController::class, 'updateGoal']);
+            Route::delete('/goals/{goal}', [SavingsController::class, 'deleteGoal']);
         });
 
     });

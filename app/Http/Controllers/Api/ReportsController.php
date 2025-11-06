@@ -298,6 +298,47 @@ class ReportsController extends Controller
         $totalExpenses = (float) ($expensesMetrics->totalExpenses ?? 0);
         $netProfit = $grossProfit - $totalExpenses;
 
+        // Get savings settings and calculate savings
+        $savingsSettings = \App\Models\ShopSavingsSetting::where('shop_id', $shopId)->first();
+
+        $savingsData = [
+            'isEnabled' => false,
+            'currentBalance' => 0.00,
+            'totalSavedInPeriod' => 0.00,
+            'proposedSavingsAmount' => 0.00,
+            'savingsType' => null,
+            'savingsPercentage' => null,
+            'fixedAmount' => null,
+            'netProfitAfterSavings' => $netProfit,
+        ];
+
+        if ($savingsSettings && $savingsSettings->is_enabled) {
+            // Calculate proposed savings based on net profit
+            $proposedSavings = 0;
+            if ($netProfit > 0) {
+                $proposedSavings = $savingsSettings->calculateSavingsAmount($netProfit);
+            }
+
+            // Get actual savings in period
+            $actualSavings = \App\Models\SavingsTransaction::where('shop_id', $shopId)
+                ->where('type', 'deposit')
+                ->whereBetween('transaction_date', [$dateRange['startDate'], $dateRange['endDate']])
+                ->sum('amount');
+
+            $savingsData = [
+                'isEnabled' => true,
+                'currentBalance' => (float) $savingsSettings->current_balance,
+                'totalSavedInPeriod' => (float) $actualSavings,
+                'proposedSavingsAmount' => (float) $proposedSavings,
+                'savingsType' => $savingsSettings->savings_type,
+                'savingsPercentage' => $savingsSettings->savings_type === 'percentage' ? (float) $savingsSettings->savings_percentage : null,
+                'fixedAmount' => $savingsSettings->savings_type === 'fixed_amount' ? (float) $savingsSettings->fixed_amount : null,
+                'netProfitAfterSavings' => $netProfit - $proposedSavings,
+                'targetAmount' => (float) $savingsSettings->target_amount,
+                'progressPercentage' => $savingsSettings->getProgressPercentage(),
+            ];
+        }
+
         // Outstanding debts
         $outstandingDebts = Customer::where('shop_id', $shopId)
             ->where('current_debt', '>', 0)
@@ -309,7 +350,7 @@ class ReportsController extends Controller
         $cashOut = $totalExpenses;
         $cashFlow = $cashIn - $cashOut;
 
-        // Daily financial breakdown
+        // Daily financial breakdown with savings
         $dailyFinancials = DB::table('sales')
             ->where('shop_id', $shopId)
             ->whereBetween('sale_date', [$dateRange['startDate'], $dateRange['endDate']])
@@ -319,9 +360,23 @@ class ReportsController extends Controller
             ->selectRaw('SUM(profit_amount) as grossProfit')
             ->groupBy('date')
             ->get()
-            ->map(function ($sale) use ($shopId, $dateRange) {
+            ->map(function ($sale) use ($shopId, $dateRange, $savingsSettings) {
                 $expenseForDate = Expense::where('shop_id', $shopId)
                     ->whereDate('expense_date', $sale->date)
+                    ->sum('amount');
+
+                $dailyNetProfit = (float) ($sale->grossProfit - $expenseForDate);
+
+                // Calculate proposed savings for this day
+                $proposedDailySavings = 0;
+                if ($savingsSettings && $savingsSettings->is_enabled && $dailyNetProfit > 0) {
+                    $proposedDailySavings = $savingsSettings->calculateSavingsAmount($dailyNetProfit);
+                }
+
+                // Get actual savings for this day
+                $actualDailySavings = \App\Models\SavingsTransaction::where('shop_id', $shopId)
+                    ->where('type', 'deposit')
+                    ->whereDate('transaction_date', $sale->date)
                     ->sum('amount');
 
                 return [
@@ -330,7 +385,10 @@ class ReportsController extends Controller
                     'cashIn' => (float) $sale->cashIn,
                     'expenses' => (float) $expenseForDate,
                     'grossProfit' => (float) $sale->grossProfit,
-                    'netProfit' => (float) ($sale->grossProfit - $expenseForDate),
+                    'netProfit' => $dailyNetProfit,
+                    'proposedSavings' => (float) $proposedDailySavings,
+                    'actualSavings' => (float) $actualDailySavings,
+                    'netProfitAfterSavings' => $dailyNetProfit - $proposedDailySavings,
                 ];
             });
 
@@ -355,6 +413,7 @@ class ReportsController extends Controller
                     'profitMargin' => round($profitMargin, 2),
                     'cashFlow' => $cashFlow,
                 ],
+                'savings' => $savingsData,
                 'expenses' => [
                     'total' => $totalExpenses,
                     'count' => (int) ($expensesMetrics->expenseCount ?? 0),
