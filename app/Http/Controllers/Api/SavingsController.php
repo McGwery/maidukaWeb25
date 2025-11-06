@@ -7,8 +7,6 @@ use App\Http\Requests\CreateSavingsGoalRequest;
 use App\Http\Requests\SavingsDepositRequest;
 use App\Http\Requests\SavingsWithdrawalRequest;
 use App\Http\Requests\UpdateSavingsGoalRequest;
-use App\Http\Requests\UpdateSavingsSettingsRequest;
-use App\Http\Resources\SavingsGoalResource;
 use App\Http\Resources\SavingsTransactionResource;
 use App\Http\Resources\ShopSavingsSettingResource;
 use App\Models\SavingsGoal;
