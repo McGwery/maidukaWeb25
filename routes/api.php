@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\POSController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseOrderController;
+use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\ShopMemberController;
 use Illuminate\Support\Facades\Route;
@@ -132,6 +133,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/{expense}', [ExpenseController::class, 'show']);
             Route::put('/{expense}', [ExpenseController::class, 'update']);
             Route::delete('/{expense}', [ExpenseController::class, 'destroy']);
+        });
+
+        // Reports & Analytics
+        Route::group(['prefix' => '{shop}/reports'], function () {
+            Route::get('/overview', [ReportsController::class, 'overviewReport']);
+            Route::get('/sales', [ReportsController::class, 'salesReport']);
+            Route::get('/products', [ReportsController::class, 'productsReport']);
+            Route::get('/financial', [ReportsController::class, 'financialReport']);
+            Route::get('/employees', [ReportsController::class, 'employeesReport']);
         });
 
     });
