@@ -26,3 +26,32 @@ Schedule::command('savings:process-daily')
     ->onOneServer()
     ->withoutOverlapping();
 
+// Schedule: Check and mark expired subscriptions (runs every hour)
+Schedule::command('subscriptions:check-expired')
+    ->hourly()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Schedule: Send reminder for subscriptions expiring in 7 days (runs daily at 9 AM)
+Schedule::command('subscriptions:check-expiring --days=7')
+    ->dailyAt('09:00')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Schedule: Send reminder for subscriptions expiring in 3 days (runs daily at 10 AM)
+Schedule::command('subscriptions:check-expiring --days=3')
+    ->dailyAt('10:00')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Schedule: Send reminder for subscriptions expiring tomorrow (runs daily at 8 AM)
+Schedule::command('subscriptions:check-expiring --days=1')
+    ->dailyAt('08:00')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Schedule: Process auto-renewal subscriptions (runs every 6 hours)
+Schedule::command('subscriptions:process-auto-renewal')
+    ->everySixHours()
+    ->onOneServer()
+    ->withoutOverlapping();

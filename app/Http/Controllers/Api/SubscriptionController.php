@@ -10,6 +10,8 @@ use App\Http\Requests\RenewSubscriptionRequest;
 use App\Http\Requests\StoreSubscriptionRequest;
 use App\Http\Requests\UpdateSubscriptionRequest;
 use App\Http\Resources\SubscriptionResource;
+use App\Jobs\SendSubscriptionCreatedJob;
+use App\Jobs\SendSubscriptionRenewedJob;
 use App\Models\Shop;
 use App\Models\Subscription;
 use Illuminate\Http\JsonResponse;
@@ -130,6 +132,9 @@ class SubscriptionController extends Controller
             ]);
 
             DB::commit();
+
+            // Send SMS notification to shop owner
+            SendSubscriptionCreatedJob::dispatch($subscription);
 
             return new JsonResponse([
                 'success' => true,
@@ -328,6 +333,9 @@ class SubscriptionController extends Controller
             }
 
             DB::commit();
+
+            // Send SMS notification to shop owner
+            SendSubscriptionRenewedJob::dispatch($subscription->fresh());
 
             return new JsonResponse([
                 'success' => true,
