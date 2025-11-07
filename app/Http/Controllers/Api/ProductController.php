@@ -23,6 +23,9 @@ class ProductController extends Controller
      */
     public function index(Request $request, Shop $shop): JsonResponse
     {
+        // Load shop settings for low stock threshold
+        $settings = $shop->settings;
+        $lowStockThreshold = $settings ? $settings->low_stock_threshold : 10;
 
         $products = $shop->products()
             ->with(['category'])
@@ -36,8 +39,8 @@ class ProductController extends Controller
             ->when($request->category_id, function ($query, $categoryId) {
                 $query->where('category_id', $categoryId);
             })
-            ->when($request->low_stock, function ($query) {
-                $query->whereColumn('current_stock', '<=', 'low_stock_threshold');
+            ->when($request->low_stock, function ($query) use ($lowStockThreshold) {
+                $query->where('current_stock', '<=', $lowStockThreshold);
             })
             ->when($request->sort_by && $request->sort_direction, function ($query) use ($request) {
                 $query->orderBy($request->sort_by, $request->sort_direction);
@@ -372,6 +375,10 @@ class ProductController extends Controller
      */
     public function inventoryAnalysis(Request $request, Shop $shop): JsonResponse
     {
+        // Load shop settings for low stock threshold
+        $settings = $shop->settings;
+        $lowStockThreshold = $settings ? $settings->low_stock_threshold : 10;
+
         $products = $shop->products()
             ->with(['stockAdjustments' => function ($query) {
                 $query->whereIn('type', [
@@ -412,6 +419,7 @@ class ProductController extends Controller
                     'expectedProfit' => round($expectedProfit, 2),
                     'expectedProfitMargin' => round($product->getExpectedProfitMargin(), 2),
                     'totalLosses' => round($losses, 2),
+                    'isLowStock' => $product->current_stock <= $lowStockThreshold,
                 ];
             }
         }
@@ -432,7 +440,8 @@ class ProductController extends Controller
                     'totalLosses' => round($totalLosses, 2),
                     'netExpectedProfit' => round($totalExpectedProfit - $totalLosses, 2),
                     'productsCount' => $products->count(),
-                    'lowStockCount' => $products->filter(fn($p) => $p->isLowStock())->count(),
+                    'lowStockCount' => $products->filter(fn($p) => $p->current_stock <= $lowStockThreshold)->count(),
+                    'lowStockThreshold' => $lowStockThreshold,
                 ],
                 'products' => $request->include_products ? $productAnalysis : null,
             ]

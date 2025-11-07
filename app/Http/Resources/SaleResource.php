@@ -9,6 +9,10 @@ class SaleResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // Load shop settings for receipt
+        $shop = $this->shop;
+        $settings = $shop?->settings;
+
         return [
             'id' => $this->id,
             'shopId' => $this->shop_id,
@@ -37,6 +41,16 @@ class SaleResource extends JsonResource
             'items' => $this->whenLoaded('items', fn() => SaleItemResource::collection($this->items)),
             'payments' => $this->whenLoaded('payments', fn() => SalePaymentResource::collection($this->payments)),
             'itemsCount' => $this->items_count ?? $this->items()->count(),
+
+            // Receipt settings from shop settings
+            'receiptSettings' => $settings ? [
+                'header' => $settings->receipt_header,
+                'footer' => $settings->receipt_footer,
+                'showLogo' => $settings->show_shop_logo_on_receipt,
+                'showTax' => $settings->show_tax_on_receipt,
+                'autoPrint' => $settings->auto_print_receipt,
+            ] : null,
+
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,
         ];

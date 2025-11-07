@@ -36,12 +36,51 @@ class POSController extends Controller
             $validated = $request->validated();
             $user = $request->user();
 
+            // Load shop settings
+            $settings = $shop->settings;
+            if (!$settings) {
+                $settings = \App\Models\ShopSettings::create(array_merge(
+                    ['shop_id' => $shop->id],
+                    \App\Models\ShopSettings::defaults()
+                ));
+            }
+
             // Calculate totals
             $subtotal = collect($validated['items'])->sum('total');
             $taxRate = $validated['taxRate'] ?? 0;
+
+            // Apply tax from settings if enabled
+            if ($settings->show_tax_on_receipt && $taxRate === 0) {
+                $taxRate = $settings->tax_percentage;
+            }
+
             $taxAmount = ($subtotal * $taxRate) / 100;
             $discountAmount = $validated['discountAmount'] ?? 0;
             $discountPercentage = $validated['discountPercentage'] ?? 0;
+
+            // Check if discounts are allowed
+            if (($discountAmount > 0 || $discountPercentage > 0) && !$settings->allow_discounts) {
+                DB::rollBack();
+                return new JsonResponse([
+                    'success' => false,
+                    'code' => Response::HTTP_FORBIDDEN,
+                    'message' => 'Discounts are not allowed for this shop.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+
+            // Check maximum discount percentage
+            if ($discountPercentage > 0 && $discountPercentage > $settings->max_discount_percentage) {
+                DB::rollBack();
+                return new JsonResponse([
+                    'success' => false,
+                    'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                    'message' => "Discount percentage cannot exceed {$settings->max_discount_percentage}%.",
+                    'data' => [
+                        'maxDiscountPercentage' => $settings->max_discount_percentage,
+                        'requestedDiscount' => $discountPercentage
+                    ]
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
 
             if ($discountPercentage > 0) {
                 $discountAmount = ($subtotal * $discountPercentage) / 100;
@@ -58,6 +97,16 @@ class POSController extends Controller
             if ($amountReceived < $totalAmount) {
                 $debtAmount = $totalAmount - $amountReceived;
                 $paymentStatus = $amountReceived > 0 ? 'partially_paid' : 'debt';
+
+                // Check if credit sales are allowed
+                if (!$settings->allow_credit_sales) {
+                    DB::rollBack();
+                    return new JsonResponse([
+                        'success' => false,
+                        'code' => Response::HTTP_FORBIDDEN,
+                        'message' => 'Credit sales are not allowed for this shop.',
+                    ], Response::HTTP_FORBIDDEN);
+                }
             }
 
             // Handle customer - create new or use existing
@@ -71,6 +120,16 @@ class POSController extends Controller
                 }
                 // If no ID but name provided, create new customer
                 elseif (!empty($validated['customer']['name'])) {
+                    // Check if customer is required for credit
+                    if ($debtAmount > 0 && $settings->require_customer_for_credit && empty($validated['customer']['name'])) {
+                        DB::rollBack();
+                        return new JsonResponse([
+                            'success' => false,
+                            'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                            'message' => 'Customer information is required for credit sales.',
+                        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                    }
+
                     $customer = Customer::create([
                         'shop_id' => $shop->id,
                         'name' => $validated['customer']['name'],
@@ -135,17 +194,26 @@ class POSController extends Controller
                 }
 
                 // Check stock availability
-                if ($product->track_inventory && $product->current_stock < $itemData['quantity']) {
-                    DB::rollBack();
-                    return new JsonResponse([
-                        'success' => false,
-                        'message' => "Insufficient stock for {$product->product_name}. Available: {$product->current_stock}",
-                        'data' => [
-                            'productName' => $product->product_name,
-                            'requestedQuantity' => $itemData['quantity'],
-                            'availableStock' => $product->current_stock,
-                        ]
-                    ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                if ($settings->track_stock && $product->track_inventory) {
+                    if (!$settings->allow_negative_stock && $product->current_stock < $itemData['quantity']) {
+                        DB::rollBack();
+                        return new JsonResponse([
+                            'success' => false,
+                            'message' => "Insufficient stock for {$product->product_name}. Available: {$product->current_stock}",
+                            'data' => [
+                                'productName' => $product->product_name,
+                                'requestedQuantity' => $itemData['quantity'],
+                                'availableStock' => $product->current_stock,
+                            ]
+                        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                    }
+
+                    // Check low stock threshold and trigger notification if enabled
+                    $newStock = $product->current_stock - $itemData['quantity'];
+                    if ($settings->isStockLow($newStock)) {
+                        // TODO: Queue low stock notification job
+                        \Log::info("Low stock alert for product: {$product->product_name}, Stock: {$newStock}");
+                    }
                 }
 
                 $itemSubtotal = $itemData['currentPrice'] * $itemData['quantity'];
@@ -168,8 +236,8 @@ class POSController extends Controller
                     'profit' => $itemProfit,
                 ]);
 
-                // Update product stock
-                if ($product->track_inventory) {
+                // Update product stock if auto-deduct is enabled
+                if ($settings->auto_deduct_stock_on_sale && $settings->track_stock && $product->track_inventory) {
                     $oldStock = $product->current_stock;
                     $newStock = $oldStock - $itemData['quantity'];
 
@@ -185,7 +253,7 @@ class POSController extends Controller
                         'previous_stock' => $oldStock,
                         'new_stock' => $newStock,
                         'reason' => "Sale #{$sale->sale_number}",
-                        'notes' => "Sold via POS",
+                        'notes' => "Sold via POS - Auto deducted",
                     ]);
                 }
             }
