@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\PhoneAuthController;
 use App\Http\Controllers\Api\AdController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\POSController;
 use App\Http\Controllers\Api\ProductController;
@@ -231,6 +232,39 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{ad}/approve', [AdController::class, 'approve']);
             Route::post('/{ad}/reject', [AdController::class, 'reject']);
             Route::post('/{ad}/toggle-pause', [AdController::class, 'togglePause']);
+        });
+
+        // Chat & Messaging
+        Route::group(['prefix' => '{shop}/chat'], function () {
+            // Conversations
+            Route::get('/conversations', [ChatController::class, 'getConversations']);
+            Route::get('/conversations/{conversation}', [ChatController::class, 'getConversation']);
+            Route::post('/conversations/{conversation}/archive', [ChatController::class, 'toggleArchive']);
+
+            // Messages
+            Route::get('/conversations/{conversation}/messages', [ChatController::class, 'getMessages']);
+            Route::post('/messages', [ChatController::class, 'sendMessage']);
+            Route::delete('/conversations/{conversation}/messages/{message}', [ChatController::class, 'deleteMessage']);
+            Route::post('/conversations/{conversation}/mark-read', [ChatController::class, 'markAsRead']);
+
+            // Typing indicators
+            Route::post('/conversations/{conversation}/typing/start', [ChatController::class, 'startTyping']);
+            Route::post('/conversations/{conversation}/typing/stop', [ChatController::class, 'stopTyping']);
+            Route::get('/conversations/{conversation}/typing', [ChatController::class, 'getTypingStatus']);
+
+            // Reactions
+            Route::post('/conversations/{conversation}/messages/{message}/react', [ChatController::class, 'reactToMessage']);
+            Route::delete('/conversations/{conversation}/messages/{message}/react', [ChatController::class, 'removeReaction']);
+
+            // Blocking
+            Route::post('/block', [ChatController::class, 'blockShop']);
+            Route::post('/unblock', [ChatController::class, 'unblockShop']);
+            Route::get('/blocked', [ChatController::class, 'getBlockedShops']);
+
+            // Utilities
+            Route::get('/unread-count', [ChatController::class, 'getUnreadCount']);
+            Route::get('/statistics', [ChatController::class, 'getStatistics']);
+            Route::get('/search-shops', [ChatController::class, 'searchShops']);
         });
 
     });
