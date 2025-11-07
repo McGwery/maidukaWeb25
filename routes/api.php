@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\PhoneAuthController;
+use App\Http\Controllers\Api\AdController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\POSController;
@@ -200,7 +201,42 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{subscription}/activate', [SubscriptionController::class, 'activate']);
         });
 
+        // Ads & Promotions
+        Route::group(['prefix' => 'ads'], function () {
+            // Get all ads for shop
+            Route::get('/', [AdController::class, 'index']);
+
+            // Create new ad
+            Route::post('/', [AdController::class, 'store']);
+
+            // Get specific ad
+            Route::get('/{ad}', [AdController::class, 'show']);
+
+            // Update ad
+            Route::put('/{ad}', [AdController::class, 'update']);
+
+            // Delete ad
+            Route::delete('/{ad}', [AdController::class, 'destroy']);
+
+            // Track view
+            Route::post('/{ad}/view', [AdController::class, 'trackView']);
+
+            // Track click
+            Route::post('/{ad}/click', [AdController::class, 'trackClick']);
+
+            // Get analytics
+            Route::get('/{ad}/analytics', [AdController::class, 'analytics']);
+
+            // Admin actions
+            Route::post('/{ad}/approve', [AdController::class, 'approve']);
+            Route::post('/{ad}/reject', [AdController::class, 'reject']);
+            Route::post('/{ad}/toggle-pause', [AdController::class, 'togglePause']);
+        });
+
     });
+
+    // Ads Feed (Deals Tab) - Outside shop context
+    Route::get('/ads/feed', [AdController::class, 'feed']);
 
     // Subscription Plans (outside shop context)
     Route::get('/subscription-plans', [SubscriptionController::class, 'plans']);
