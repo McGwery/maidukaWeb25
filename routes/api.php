@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\SavingsController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\ShopMemberController;
+use App\Http\Controllers\Api\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 # Authentication Management
@@ -164,5 +165,35 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/goals/{goal}', [SavingsController::class, 'deleteGoal']);
         });
 
+        // Subscription Management
+        Route::group(['prefix' => '{shop}/subscriptions'], function () {
+            // Get all subscriptions
+            Route::get('/', [SubscriptionController::class, 'index']);
+
+            // Get current active subscription
+            Route::get('/current', [SubscriptionController::class, 'current']);
+
+            // Get subscription statistics
+            Route::get('/statistics', [SubscriptionController::class, 'statistics']);
+
+            // Create new subscription
+            Route::post('/', [SubscriptionController::class, 'store']);
+
+            // Get specific subscription
+            Route::get('/{subscription}', [SubscriptionController::class, 'show']);
+
+            // Update subscription
+            Route::put('/{subscription}', [SubscriptionController::class, 'update']);
+
+            // Subscription actions
+            Route::post('/{subscription}/cancel', [SubscriptionController::class, 'cancel']);
+            Route::post('/{subscription}/renew', [SubscriptionController::class, 'renew']);
+            Route::post('/{subscription}/suspend', [SubscriptionController::class, 'suspend']);
+            Route::post('/{subscription}/activate', [SubscriptionController::class, 'activate']);
+        });
+
     });
+
+    // Subscription Plans (outside shop context)
+    Route::get('/subscription-plans', [SubscriptionController::class, 'plans']);
 });

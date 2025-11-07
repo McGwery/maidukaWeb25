@@ -82,6 +82,19 @@ class Shop extends Model
         return $this->hasMany(Expense::class);
     }
 
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function activeSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class)
+            ->where('status', 'active')
+            ->where('expires_at', '>', now())
+            ->latestOfMany('starts_at');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
