@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\SavingsController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\ShopMemberController;
+use App\Http\Controllers\Api\ShopSettingsController;
 use App\Http\Controllers\Api\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
@@ -146,6 +147,13 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/employees', [ReportsController::class, 'employeesReport']);
         });
 
+        // Shop Settings
+        Route::group(['prefix' => '{shop}/settings'], function () {
+            Route::get('/', [ShopSettingsController::class, 'show']);
+            Route::put('/', [ShopSettingsController::class, 'update']);
+            Route::post('/reset', [ShopSettingsController::class, 'reset']);
+        });
+
         // Savings & Goals Management
         Route::group(['prefix' => '{shop}/savings'], function () {
             // Settings
@@ -196,4 +204,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Subscription Plans (outside shop context)
     Route::get('/subscription-plans', [SubscriptionController::class, 'plans']);
+
+    // Settings Categories (outside shop context)
+    Route::get('/settings-categories', [ShopSettingsController::class, 'categories']);
 });

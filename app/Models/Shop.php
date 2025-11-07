@@ -95,6 +95,11 @@ class Shop extends Model
             ->latestOfMany('starts_at');
     }
 
+    public function settings(): HasOne
+    {
+        return $this->hasOne(ShopSettings::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
