@@ -17,10 +17,13 @@ use Symfony\Component\HttpFoundation\Response;
 class ExpenseController extends Controller
 {
     /**
-     * Display a listing of expenses for the specified shop.
+     * Display a listing of expenses.
      */
     public function index(Request $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        $this->authorize('viewAny', [Expense::class, $shop]);
+
         $expenses = $shop->expenses()
             ->with(['recordedBy'])
             ->when($request->search, function ($query, $search) {
@@ -69,6 +72,9 @@ class ExpenseController extends Controller
      */
     public function store(StoreExpenseRequest $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        $this->authorize('create', [Expense::class, $shop]);
+
         $data = $request->validated();
         $data['shop_id'] = $shop->id;
         $data['recorded_by'] = $request->user()->id;
@@ -102,7 +108,9 @@ class ExpenseController extends Controller
      */
     public function show(Shop $shop, Expense $expense): JsonResponse
     {
-        // Verify expense belongs to shop
+        // Authorization
+        $this->authorize('view', $expense);
+
         if ($expense->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
@@ -125,7 +133,9 @@ class ExpenseController extends Controller
      */
     public function update(UpdateExpenseRequest $request, Shop $shop, Expense $expense): JsonResponse
     {
-        // Verify expense belongs to shop
+        // Authorization
+        $this->authorize('update', $expense);
+
         if ($expense->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
@@ -163,7 +173,9 @@ class ExpenseController extends Controller
      */
     public function destroy(Shop $shop, Expense $expense): JsonResponse
     {
-        // Verify expense belongs to shop
+        // Authorization
+        $this->authorize('delete', $expense);
+
         if ($expense->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
@@ -182,10 +194,14 @@ class ExpenseController extends Controller
     }
 
     /**
-     * Get expense summary grouped by category.
+     * Get expense summary with analytics.
      */
     public function summary(Request $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        $this->authorize('viewSummary', [Expense::class, $shop]);
+
+        // Validate date filters
         $startDate = $request->startDate;
         $endDate = $request->endDate;
 

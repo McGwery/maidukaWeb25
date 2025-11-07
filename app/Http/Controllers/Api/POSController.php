@@ -30,6 +30,9 @@ class POSController extends Controller
      */
     public function completeSale(CompleteSaleRequest $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        $this->authorize('create', [Sale::class, $shop]);
+
         try {
             DB::beginTransaction();
 
@@ -304,6 +307,9 @@ class POSController extends Controller
      */
     public function getSales(Request $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        $this->authorize('viewAny', [Sale::class, $shop]);
+
         $query = Sale::where('shop_id', $shop->id)
             ->with(['customer', 'user', 'items'])
             ->withCount('items');
@@ -357,10 +363,13 @@ class POSController extends Controller
     }
 
     /**
-     * Get single sale details
+     * Get a specific sale
      */
     public function getSale(Shop $shop, Sale $sale): JsonResponse
     {
+        // Authorization
+        $this->authorize('view', $sale);
+
         if ($sale->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
@@ -384,7 +393,10 @@ class POSController extends Controller
      */
     public function getSalesAnalytics(Request $request, Shop $shop): JsonResponse
     {
-        $fromDate = $request->fromDate ?? now()->startOfMonth();
+        // Authorization
+        $this->authorize('viewAnalytics', [Sale::class, $shop]);
+
+        $query = Sale::where('shop_id', $shop->id);
         $toDate = $request->toDate ?? now()->endOfMonth();
 
         $sales = Sale::where('shop_id', $shop->id)
@@ -471,10 +483,13 @@ class POSController extends Controller
     }
 
     /**
-     * Process refund
+     * Refund a sale
      */
     public function refundSale(Request $request, Shop $shop, Sale $sale): JsonResponse
     {
+        // Authorization
+        $this->authorize('refund', $sale);
+
         if ($sale->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
@@ -574,10 +589,13 @@ class POSController extends Controller
     }
 
     /**
-     * Add payment to existing sale (debt payment)
+     * Add payment to an existing sale
      */
     public function addPayment(Request $request, Shop $shop, Sale $sale): JsonResponse
     {
+        // Authorization
+        $this->authorize('addPayment', $sale);
+
         if ($sale->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
@@ -662,10 +680,13 @@ class POSController extends Controller
     // Customer Management
 
     /**
-     * Get all customers for a shop
+     * Get customers for a shop
      */
     public function getCustomers(Request $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        $this->authorize('viewAny', [Customer::class, $shop]);
+
         $query = Customer::where('shop_id', $shop->id);
 
         if ($request->search) {
@@ -698,11 +719,14 @@ class POSController extends Controller
     }
 
     /**
-     * Create new customer
+     * Create a new customer
      */
     public function createCustomer(CustomerRequest $request, Shop $shop): JsonResponse
     {
-        $customer = Customer::firstOrCreate([
+        // Authorization
+        $this->authorize('create', [Customer::class, $shop]);
+
+        $customer = Customer::create(array_merge(
             'shop_id' => $shop->id,
             'name' => $request->name,
             'phone' => $request->phone,
@@ -723,10 +747,13 @@ class POSController extends Controller
     }
 
     /**
-     * Update customer
+     * Update a customer
      */
     public function updateCustomer(CustomerRequest $request, Shop $shop, Customer $customer): JsonResponse
     {
+        // Authorization
+        $this->authorize('update', $customer);
+
         if ($customer->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
@@ -754,10 +781,13 @@ class POSController extends Controller
     }
 
     /**
-     * Get customer details with sales history
+     * Delete a customer
      */
-    public function getCustomer(Shop $shop, Customer $customer): JsonResponse
+    public function deleteCustomer(Shop $shop, Customer $customer): JsonResponse
     {
+        // Authorization
+        $this->authorize('delete', $customer);
+
         if ($customer->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,
@@ -789,10 +819,13 @@ class POSController extends Controller
     }
 
     /**
-     * Delete customer
+     * Get a specific customer
      */
-    public function deleteCustomer(Shop $shop, Customer $customer): JsonResponse
+    public function getCustomer(Shop $shop, Customer $customer): JsonResponse
     {
+        // Authorization
+        $this->authorize('view', $customer);
+
         if ($customer->shop_id !== $shop->id) {
             return new JsonResponse([
                 'success' => false,

@@ -8,11 +8,14 @@ use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\Shop;
 use App\Models\ShopMember;
+use App\Policies\ReportPolicy;
 use App\Traits\HasDateRangeFilter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class ReportsController extends Controller
 {
@@ -33,6 +36,10 @@ class ReportsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('viewSalesReport', [ReportPolicy::class, $shop]);
 
         // Total sales metrics
         $salesMetrics = Sale::where('shop_id', $shopId)
@@ -143,6 +150,10 @@ class ReportsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('viewProductsReport', [ReportPolicy::class, $shop]);
 
         // Total products
         $totalProducts = Product::where('shop_id', $shopId)->count();
@@ -262,6 +273,10 @@ class ReportsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('viewFinancialReport', [ReportPolicy::class, $shop]);
 
         // Revenue from sales
         $salesMetrics = Sale::where('shop_id', $shopId)
@@ -435,7 +450,7 @@ class ReportsController extends Controller
     }
 
     /**
-     * Get employees/team report
+     * Get employees report
      */
     public function employeesReport(Request $request): JsonResponse
     {
@@ -449,6 +464,10 @@ class ReportsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('viewEmployeesReport', [ReportPolicy::class, $shop]);
 
         // Total team members
         $totalMembers = ShopMember::where('shop_id', $shopId)->count();
@@ -545,6 +564,20 @@ class ReportsController extends Controller
      */
     public function overviewReport(Request $request): JsonResponse
     {
+        $this->validateDateFilter($request);
+        $dateRange = $this->getDateRange($request);
+        $shopId = $request->user()->activeShop->shop_id ?? null;
+
+        if (!$shopId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active shop selected',
+            ], 400);
+        }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('viewOverviewReport', [ReportPolicy::class, $shop]);
         $this->validateDateFilter($request);
         $dateRange = $this->getDateRange($request);
         $shopId = $request->user()->activeShop->shop_id ?? null;

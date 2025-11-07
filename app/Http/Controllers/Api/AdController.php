@@ -70,7 +70,7 @@ class AdController extends Controller
     }
 
     /**
-     * Get all ads for shop owner or admin.
+     * Get ads for a shop
      */
     public function index(Request $request): JsonResponse
     {
@@ -82,6 +82,10 @@ class AdController extends Controller
         // Filter by shop if shop owner
         if ($shopId) {
             $shop = Shop::findOrFail($shopId);
+
+            // Authorization
+            $this->authorize('viewAny', [Ad::class, $shop]);
+
             $query->where('shop_id', $shop->id);
         }
 
@@ -147,6 +151,9 @@ class AdController extends Controller
             // If shop is creating ad, ensure they have active subscription
             if ($shopId) {
                 $shop = Shop::findOrFail($shopId);
+
+                // Authorization
+                $this->authorize('create', [Ad::class, $shop]);
 
                 // Check if shop has active subscription
                 $activeSubscription = $shop->activeSubscription;
@@ -236,6 +243,9 @@ class AdController extends Controller
      */
     public function show(Ad $ad): JsonResponse
     {
+        // Authorization
+        $this->authorize('view', $ad);
+
         $ad->load(['shop', 'creator', 'approver']);
 
         return new JsonResponse([
@@ -250,6 +260,9 @@ class AdController extends Controller
      */
     public function update(UpdateAdRequest $request, Ad $ad): JsonResponse
     {
+        // Authorization
+        $this->authorize('update', $ad);
+
         $data = $request->validated();
 
         try {
@@ -290,6 +303,9 @@ class AdController extends Controller
      */
     public function destroy(Ad $ad): JsonResponse
     {
+        // Authorization
+        $this->authorize('delete', $ad);
+
         try {
             $ad->delete();
 
@@ -421,6 +437,9 @@ class AdController extends Controller
      */
     public function analytics(Request $request, Ad $ad): JsonResponse
     {
+        // Authorization
+        $this->authorize('viewAnalytics', $ad);
+
         $period = $request->period ?? 'week'; // week, month, all
 
         $startDate = match($period) {

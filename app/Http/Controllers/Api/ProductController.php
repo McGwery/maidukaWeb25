@@ -23,6 +23,9 @@ class ProductController extends Controller
      */
     public function index(Request $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        $this->authorize('viewAny', [Product::class, $shop]);
+
         // Load shop settings for low stock threshold
         $settings = $shop->settings;
         $lowStockThreshold = $settings ? $settings->low_stock_threshold : 10;
@@ -69,10 +72,8 @@ class ProductController extends Controller
      */
     public function store(CreateProductRequest $request, Shop $shop): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
+        // Authorization
+        $this->authorize('create', [Product::class, $shop]);
 
         $data = $request->validated();
 
@@ -127,12 +128,10 @@ class ProductController extends Controller
     /**
      * Display the specified product.
      */
-    public function show(Request $request, Shop $shop, Product $product): JsonResponse
+    public function show(Shop $shop, Product $product): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
+        // Authorization
+        $this->authorize('view', $product);
 
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
@@ -165,10 +164,8 @@ class ProductController extends Controller
      */
     public function update(UpdateProductRequest $request, Shop $shop, Product $product): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
+        // Authorization
+        $this->authorize('update', $product);
 
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
@@ -238,10 +235,10 @@ class ProductController extends Controller
      */
     public function destroy(Request $request, Shop $shop, Product $product): JsonResponse
     {
-        // Verify user has access to this shop
-        // if (!$shop->hasAccess($request->user())) {
-        //     abort(403, 'You do not have access to this shop.');
-        // }
+        // Authorization
+        $this->authorize('delete', $product);
+
+        // Check if product belongs to this shop
 
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
@@ -265,6 +262,9 @@ class ProductController extends Controller
      */
     public function updateStock(StockAdjustmentRequest $request, Shop $shop, Product $product): JsonResponse
     {
+        // Authorization
+        $this->authorize('updateStock', $product);
+
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
             return new JsonResponse([
@@ -318,6 +318,9 @@ class ProductController extends Controller
      */
     public function stockAdjustmentHistory(Request $request, Shop $shop, Product $product): JsonResponse
     {
+        // Authorization
+        $this->authorize('viewStockAdjustments', [Product::class, $shop]);
+
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
             return new JsonResponse([
@@ -371,11 +374,14 @@ class ProductController extends Controller
     }
 
     /**
-     * Get inventory value and profit analysis for shop.
+     * Get inventory analysis (capital, expected profit, etc.).
      */
     public function inventoryAnalysis(Request $request, Shop $shop): JsonResponse
     {
-        // Load shop settings for low stock threshold
+        // Authorization
+        $this->authorize('viewInventoryAnalysis', [Product::class, $shop]);
+
+        $settings = $shop->settings;
         $settings = $shop->settings;
         $lowStockThreshold = $settings ? $settings->low_stock_threshold : 10;
 
@@ -449,10 +455,13 @@ class ProductController extends Controller
     }
 
     /**
-     * Get shop-wide stock adjustment summary.
+     * Get adjustments summary for all products in the shop.
      */
     public function adjustmentsSummary(Request $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        $this->authorize('viewStockAdjustments', [Product::class, $shop]);
+
         $query = StockAdjustment::query()
             ->whereHas('product', function ($q) use ($shop) {
                 $q->where('shop_id', $shop->id);

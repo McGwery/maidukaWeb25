@@ -9,12 +9,15 @@ use App\Http\Requests\SavingsWithdrawalRequest;
 use App\Http\Requests\UpdateSavingsGoalRequest;
 use App\Http\Resources\SavingsTransactionResource;
 use App\Http\Resources\ShopSavingsSettingResource;
+use App\Models\Shop;
 use App\Models\SavingsGoal;
 use App\Models\SavingsTransaction;
 use App\Models\ShopSavingsSetting;
+use App\Policies\SavingsPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class SavingsController extends Controller
 {
@@ -31,6 +34,10 @@ class SavingsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('view', [SavingsPolicy::class, $shop]);
 
         $settings = ShopSavingsSetting::firstOrCreate(
             ['shop_id' => $shopId],
@@ -62,6 +69,10 @@ class SavingsController extends Controller
             ], 400);
         }
 
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('manageSettings', [SavingsPolicy::class, $shop]);
+
         $validated = $request->validated();
 
         $settings = ShopSavingsSetting::firstOrCreate(['shop_id' => $shopId]);
@@ -91,7 +102,7 @@ class SavingsController extends Controller
     }
 
     /**
-     * Manual deposit to savings
+     * Make a manual savings deposit
      */
     public function deposit(SavingsDepositRequest $request): JsonResponse
     {
@@ -103,6 +114,10 @@ class SavingsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('deposit', [SavingsPolicy::class, $shop]);
 
         $validated = $request->validated();
 
@@ -221,7 +236,7 @@ class SavingsController extends Controller
     }
 
     /**
-     * Get savings transactions history
+     * Get savings transactions
      */
     public function getTransactions(Request $request): JsonResponse
     {
@@ -233,6 +248,10 @@ class SavingsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('viewTransactions', [SavingsPolicy::class, $shop]);
 
         $type = $request->query('type'); // 'deposit', 'withdrawal', or null for all
         $limit = $request->query('limit', 50);
@@ -334,9 +353,9 @@ class SavingsController extends Controller
     }
 
     /**
-     * Create a savings goal
+     * Make a savings withdrawal
      */
-    public function createGoal(CreateSavingsGoalRequest $request): JsonResponse
+    public function withdraw(SavingsWithdrawalRequest $request): JsonResponse
     {
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
@@ -346,6 +365,10 @@ class SavingsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('withdraw', [SavingsPolicy::class, $shop]);
 
         $validated = $request->validated();
 
@@ -375,9 +398,9 @@ class SavingsController extends Controller
     }
 
     /**
-     * Get all savings goals
+     * Create a savings goal
      */
-    public function getGoals(Request $request): JsonResponse
+    public function createGoal(CreateSavingsGoalRequest $request): JsonResponse
     {
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
@@ -387,6 +410,10 @@ class SavingsController extends Controller
                 'message' => 'No active shop selected',
             ], 400);
         }
+
+        // Authorization
+        $shop = Shop::findOrFail($shopId);
+        Gate::authorize('manageGoals', [SavingsPolicy::class, $shop]);
 
         $status = $request->query('status'); // 'active', 'completed', 'cancelled', 'paused'
 

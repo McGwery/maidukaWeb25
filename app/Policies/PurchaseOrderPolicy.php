@@ -3,133 +3,85 @@
 namespace App\Policies;
 
 use App\Models\PurchaseOrder;
-use App\Models\User;
 use App\Models\Shop;
-use App\Enums\ShopMemberRole;
-use Illuminate\Auth\Access\HandlesAuthorization;
+use App\Models\User;
+use App\Traits\HasShopPolicy;
 
 class PurchaseOrderPolicy
 {
-    use HandlesAuthorization;
+    use HasShopPolicy;
 
     /**
-     * Determine whether the user can view purchase orders.
+     * Determine if the user can view any purchase orders.
      */
     public function viewAny(User $user, Shop $shop): bool
     {
-        $member = $shop->shopMembers()->where('user_id', $user->id)->first();
-        if (!$member || !$member->is_active) return false;
-
-        return in_array('*', $member->permissions) ||
-               in_array('manage_purchases', $member->permissions) ||
-               in_array('view_inventory', $member->permissions);
+        return $this->hasPermission($user, $shop, 'view_purchases');
     }
 
     /**
-     * Determine whether the user can view the purchase order.
+     * Determine if the user can view the purchase order.
      */
-    public function view(User $user, PurchaseOrder $purchaseOrder, Shop $shop): bool
+    public function view(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        if ($purchaseOrder->buyer_shop_id !== $shop->id && $purchaseOrder->seller_shop_id !== $shop->id) {
-            return false;
-        }
-
-        $member = $shop->shopMembers()->where('user_id', $user->id)->first();
-        if (!$member || !$member->is_active) return false;
-
-        return in_array('*', $member->permissions) ||
-               in_array('manage_purchases', $member->permissions) ||
-               in_array('view_inventory', $member->permissions);
+        // Can view if it's their shop as buyer or seller
+        return $this->hasPermission($user, $purchaseOrder->buyerShop, 'view_purchases') ||
+               $this->hasPermission($user, $purchaseOrder->sellerShop, 'view_purchases');
     }
 
     /**
-     * Determine whether the user can create purchase orders.
+     * Determine if the user can create purchase orders.
      */
     public function create(User $user, Shop $shop): bool
     {
-        $member = $shop->shopMembers()->where('user_id', $user->id)->first();
-        if (!$member || !$member->is_active) return false;
-
-        return in_array('*', $member->permissions) ||
-               in_array('manage_purchases', $member->permissions);
+        return $this->hasPermission($user, $shop, 'manage_purchases');
     }
 
     /**
-     * Determine whether the user can update the purchase order.
+     * Determine if the user can update the purchase order.
      */
-    public function update(User $user, PurchaseOrder $purchaseOrder, Shop $shop): bool
+    public function update(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        if ($purchaseOrder->buyer_shop_id !== $shop->id) {
-            return false;
-        }
-
-        $member = $shop->shopMembers()->where('user_id', $user->id)->first();
-        if (!$member || !$member->is_active) return false;
-
-        return in_array('*', $member->permissions) ||
-               in_array('manage_purchases', $member->permissions);
+        return $this->hasPermission($user, $purchaseOrder->buyerShop, 'manage_purchases');
     }
 
     /**
-     * Determine whether the user can approve the purchase order.
+     * Determine if the user can delete the purchase order.
      */
-    public function approve(User $user, PurchaseOrder $purchaseOrder, Shop $shop): bool
+    public function delete(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        if ($purchaseOrder->buyer_shop_id !== $shop->id) {
-            return false;
-        }
-
-        $member = $shop->shopMembers()->where('user_id', $user->id)->first();
-        if (!$member || !$member->is_active) return false;
-
-        return in_array('*', $member->permissions) ||
-               in_array('approve_purchases', $member->permissions);
+        return $this->hasPermission($user, $purchaseOrder->buyerShop, 'manage_purchases');
     }
 
     /**
-     * Determine whether the user can record payments.
+     * Determine if the user can update purchase order status.
      */
-    public function recordPayment(User $user, PurchaseOrder $purchaseOrder, Shop $shop): bool
+    public function updateStatus(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        if ($purchaseOrder->buyer_shop_id !== $shop->id) {
-            return false;
+        // Buyer can update, seller needs approve permission
+        if ($purchaseOrder->buyer_shop_id === $purchaseOrder->buyerShop->id) {
+            return $this->hasPermission($user, $purchaseOrder->buyerShop, 'manage_purchases');
         }
 
-        $member = $shop->shopMembers()->where('user_id', $user->id)->first();
-        if (!$member || !$member->is_active) return false;
-
-        return in_array('*', $member->permissions) ||
-               in_array('record_purchase_payments', $member->permissions);
+        return $this->hasPermission($user, $purchaseOrder->sellerShop, 'approve_purchases');
     }
 
     /**
-     * Determine whether the user can transfer stock.
+     * Determine if the user can record payments.
      */
-    public function transferStock(User $user, PurchaseOrder $purchaseOrder, Shop $shop): bool
+    public function recordPayment(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        if ($purchaseOrder->seller_shop_id !== $shop->id) {
-            return false;
-        }
-
-        $member = $shop->shopMembers()->where('user_id', $user->id)->first();
-        if (!$member || !$member->is_active) return false;
-
-        return in_array('*', $member->permissions) ||
-               in_array('transfer_stock', $member->permissions);
+        return $this->hasPermission($user, $purchaseOrder->buyerShop, 'record_purchase_payments') ||
+               $this->hasPermission($user, $purchaseOrder->buyerShop, 'manage_purchases');
     }
 
     /**
-     * Determine whether the user can delete the purchase order.
+     * Determine if the user can transfer stock.
      */
-    public function delete(User $user, PurchaseOrder $purchaseOrder, Shop $shop): bool
+    public function transferStock(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        if ($purchaseOrder->buyer_shop_id !== $shop->id) {
-            return false;
-        }
-
-        $member = $shop->shopMembers()->where('user_id', $user->id)->first();
-        if (!$member || !$member->is_active) return false;
-
-        return in_array('*', $member->permissions); // Only shop owner can delete purchase orders
+        return $this->hasPermission($user, $purchaseOrder->buyerShop, 'transfer_stock') ||
+               $this->hasPermission($user, $purchaseOrder->buyerShop, 'manage_purchases');
     }
 }
+

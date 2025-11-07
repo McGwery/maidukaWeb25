@@ -7,8 +7,10 @@ use App\Http\Requests\UpdateShopSettingsRequest;
 use App\Http\Resources\ShopSettingsResource;
 use App\Models\Shop;
 use App\Models\ShopSettings;
+use App\Policies\ShopSettingsPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
 class ShopSettingsController extends Controller
@@ -18,6 +20,9 @@ class ShopSettingsController extends Controller
      */
     public function show(Shop $shop): JsonResponse
     {
+        // Authorization
+        Gate::authorize('view', [ShopSettingsPolicy::class, $shop]);
+
         // Get or create settings with defaults
         $settings = $shop->settings;
 
@@ -40,6 +45,9 @@ class ShopSettingsController extends Controller
      */
     public function update(UpdateShopSettingsRequest $request, Shop $shop): JsonResponse
     {
+        // Authorization
+        Gate::authorize('update', [ShopSettingsPolicy::class, $shop]);
+
         try {
             DB::beginTransaction();
 
@@ -91,6 +99,9 @@ class ShopSettingsController extends Controller
      */
     public function reset(Shop $shop): JsonResponse
     {
+        // Authorization
+        Gate::authorize('reset', [ShopSettingsPolicy::class, $shop]);
+
         try {
             DB::beginTransaction();
 
