@@ -3,6 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\MessageType;
+use App\Events\MessageDeleted;
+use App\Events\MessageRead;
+use App\Events\MessageReactionAdded;
+use App\Events\MessageReactionRemoved;
+use App\Events\MessageSent;
+use App\Events\UserTyping;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SendMessageRequest;
 use App\Http\Resources\ConversationResource;
@@ -192,6 +198,9 @@ class ChatController extends Controller
             // Update conversation's last message
             $conversation->updateLastMessage($message);
 
+            // Broadcast message sent event
+            broadcast(new MessageSent($message, $conversation->id))->toOthers();
+
             DB::commit();
 
             $message->load(['senderShop', 'senderUser', 'receiverShop', 'product', 'replyTo.senderUser', 'reactions']);
@@ -224,6 +233,9 @@ class ChatController extends Controller
 
         $msg->deleteFor($shop);
 
+        // Broadcast message deleted event
+        broadcast(new MessageDeleted($msg->id, $conversation, $shop))->toOthers();
+
         return response()->json([
             'success' => true,
             'code' => 200,
@@ -251,10 +263,18 @@ class ChatController extends Controller
             $query->whereIn('id', $messageIds);
         }
 
+        $readTime = now();
         $updated = $query->update([
             'is_read' => true,
-            'read_at' => now(),
+            'read_at' => $readTime,
         ]);
+
+        // Broadcast message read event for each message
+        if ($messageIds) {
+            foreach ($messageIds as $msgId) {
+                broadcast(new MessageRead($msgId, $conversation, $readTime->toIso8601String()))->toOthers();
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -331,6 +351,18 @@ class ChatController extends Controller
             ]
         );
 
+        // Broadcast typing event
+        $user = auth()->user();
+        $shopModel = Shop::find($shop);
+        broadcast(new UserTyping(
+            $conv->id,
+            $shop,
+            $shopModel->name,
+            $user->id,
+            $user->name,
+            true
+        ))->toOthers();
+
         return response()->json([
             'success' => true,
             'code' => 200,
@@ -347,6 +379,18 @@ class ChatController extends Controller
             ->where('shop_id', $shop)
             ->where('user_id', auth()->id())
             ->delete();
+
+        // Broadcast typing stopped event
+        $user = auth()->user();
+        $shopModel = Shop::find($shop);
+        broadcast(new UserTyping(
+            $conversation,
+            $shop,
+            $shopModel->name,
+            $user->id,
+            $user->name,
+            false
+        ))->toOthers();
 
         return response()->json([
             'success' => true,
@@ -411,6 +455,16 @@ class ChatController extends Controller
             ]
         );
 
+        // Broadcast reaction added event
+        $user = auth()->user();
+        broadcast(new MessageReactionAdded(
+            $msg->id,
+            $conversation,
+            $user->id,
+            $user->name,
+            $reaction->reaction
+        ))->toOthers();
+
         return response()->json([
             'success' => true,
             'code' => 200,
@@ -434,6 +488,13 @@ class ChatController extends Controller
         MessageReaction::where('message_id', $msg->id)
             ->where('user_id', auth()->id())
             ->delete();
+
+        // Broadcast reaction removed event
+        broadcast(new MessageReactionRemoved(
+            $msg->id,
+            $conversation,
+            auth()->id()
+        ))->toOthers();
 
         return response()->json([
             'success' => true,
