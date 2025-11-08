@@ -18,12 +18,9 @@ use App\Policies\CustomerPolicy;
 use App\Policies\ExpensePolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\PurchaseOrderPolicy;
-use App\Policies\ReportPolicy;
 use App\Policies\SalePolicy;
-use App\Policies\SavingsPolicy;
 use App\Policies\ShopMemberPolicy;
 use App\Policies\ShopPolicy;
-use App\Policies\ShopSettingsPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
 class AuthServiceProvider extends ServiceProvider
