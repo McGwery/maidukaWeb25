@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ProductType;
 use App\Enums\UnitType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
@@ -16,6 +17,7 @@ class UpdateProductRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'product_type' => ['sometimes', new Enum(ProductType::class)],
             'product_name' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|nullable|string',
             'category_id' => 'sometimes|nullable|uuid|exists:categories,id',
@@ -29,7 +31,11 @@ class UpdateProductRequest extends FormRequest
             'break_down_count_per_unit' => 'sometimes|nullable|required_if:sell_individual_items,true|integer|min:1',
             'price_per_item' => 'sometimes|nullable|required_if:sell_individual_items,true|numeric|min:0',
             'low_stock_threshold' => 'sometimes|nullable|integer|min:0',
-            'notes' => 'sometimes|nullable|string'
+            'notes' => 'sometimes|nullable|string',
+
+            // Service-specific fields
+            'service_duration' => 'sometimes|nullable|numeric|min:0.1|max:999.99',
+            'hourly_rate' => 'sometimes|nullable|numeric|min:0',
         ];
     }
 }

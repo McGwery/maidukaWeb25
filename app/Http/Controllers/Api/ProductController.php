@@ -34,7 +34,7 @@ class ProductController extends Controller
             ->with(['category'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
+                    $q->where('product_name', 'like', "%{$search}%")
                         ->orWhere('sku', 'like', "%{$search}%")
                         ->orWhere('barcode', 'like', "%{$search}%");
                 });
@@ -42,8 +42,12 @@ class ProductController extends Controller
             ->when($request->category_id, function ($query, $categoryId) {
                 $query->where('category_id', $categoryId);
             })
+            ->when($request->product_type, function ($query, $productType) {
+                $query->where('product_type', $productType);
+            })
             ->when($request->low_stock, function ($query) use ($lowStockThreshold) {
-                $query->where('current_stock', '<=', $lowStockThreshold);
+                $query->where('track_inventory', true)
+                      ->where('current_stock', '<=', $lowStockThreshold);
             })
             ->when($request->sort_by && $request->sort_direction, function ($query) use ($request) {
                 $query->orderBy($request->sort_by, $request->sort_direction);
@@ -80,21 +84,36 @@ class ProductController extends Controller
         // Set the shop_id
         $data['shop_id'] = $shop->id;
 
-        // Calculate cost per unit
-        $data['cost_per_unit'] = round($data['total_amount_paid'] / $data['purchase_quantity'], 2);
+        $isService = ($data['product_type'] ?? 'physical') === 'service';
 
-        // Set initial stock
-        $data['current_stock'] = $data['purchase_quantity'];
+        if ($isService) {
+            // For services, set defaults
+            $data['track_inventory'] = false;
+            $data['current_stock'] = null;
+            $data['low_stock_threshold'] = null;
 
-        // Calculate low stock threshold if not provided (20% rule)
-        if (!isset($data['low_stock_threshold'])) {
-            $data['low_stock_threshold'] = ceil($data['purchase_quantity'] * 0.2);
-        }
+            // Calculate price from hourly rate if not provided
+            if (!isset($data['price_per_unit']) && isset($data['service_duration']) && isset($data['hourly_rate'])) {
+                $data['price_per_unit'] = round($data['service_duration'] * $data['hourly_rate'], 2);
+            }
+        } else {
+            // For physical products
+            // Calculate cost per unit
+            $data['cost_per_unit'] = round($data['total_amount_paid'] / $data['purchase_quantity'], 2);
 
-        // Calculate price per item if selling individual items and price not provided
-        if ($data['sell_individual_items'] && !isset($data['price_per_item']) && isset($data['break_down_count_per_unit'])) {
-            $totalItems = $data['purchase_quantity'] * $data['break_down_count_per_unit'];
-            $data['price_per_item'] = round($data['total_amount_paid'] / $totalItems, 2);
+            // Set initial stock
+            $data['current_stock'] = $data['purchase_quantity'];
+
+            // Calculate low stock threshold if not provided (20% rule)
+            if (!isset($data['low_stock_threshold'])) {
+                $data['low_stock_threshold'] = ceil($data['purchase_quantity'] * 0.2);
+            }
+
+            // Calculate price per item if selling individual items and price not provided
+            if ($data['sell_individual_items'] && !isset($data['price_per_item']) && isset($data['break_down_count_per_unit'])) {
+                $totalItems = $data['purchase_quantity'] * $data['break_down_count_per_unit'];
+                $data['price_per_item'] = round($data['total_amount_paid'] / $totalItems, 2);
+            }
         }
 
         $product = Product::create($data);
@@ -102,25 +121,37 @@ class ProductController extends Controller
         // Load relationships for the response
         $product->load(['category', 'shop']);
 
+        $computed = [];
+
+        if ($isService) {
+            $computed = [
+                'servicePrice' => $product->getServicePrice(),
+                'serviceDuration' => $product->service_duration,
+                'hourlyRate' => $product->hourly_rate,
+            ];
+        } else {
+            $computed = [
+                'suggestedLowStockThreshold' => ceil($data['purchase_quantity'] * 0.2),
+                'suggestedPricePerItem' => $data['sell_individual_items'] && isset($data['break_down_count_per_unit'])
+                    ? round($data['total_amount_paid'] / ($data['purchase_quantity'] * $data['break_down_count_per_unit']), 2)
+                    : null,
+                'totalIndividualItems' => $data['sell_individual_items'] && isset($data['break_down_count_per_unit'])
+                    ? ($data['purchase_quantity'] * $data['break_down_count_per_unit'])
+                    : null,
+                'costPerUnit' => $data['cost_per_unit'],
+                'profitMarginPerUnit' => isset($data['price_per_unit'])
+                    ? round((($data['price_per_unit'] - $data['cost_per_unit']) / $data['cost_per_unit']) * 100, 2)
+                    : null,
+            ];
+        }
+
         return new JsonResponse([
             'success' => true,
             'code' => Response::HTTP_CREATED,
-            'message' => 'Product added successfully',
+            'message' => $isService ? 'Service added successfully' : 'Product added successfully',
             'data' => [
                 'product' => new ProductResource($product),
-                'computed' => [
-                    'suggestedLowStockThreshold' => ceil($data['purchase_quantity'] * 0.2),
-                    'suggestedPricePerItem' => $data['sell_individual_items'] && isset($data['break_down_count_per_unit'])
-                        ? round($data['total_amount_paid'] / ($data['purchase_quantity'] * $data['break_down_count_per_unit']), 2)
-                        : null,
-                    'totalIndividualItems' => $data['sell_individual_items'] && isset($data['break_down_count_per_unit'])
-                        ? ($data['purchase_quantity'] * $data['break_down_count_per_unit'])
-                        : null,
-                    'costPerUnit' => $data['cost_per_unit'],
-                    'profitMarginPerUnit' => isset($data['price_per_unit'])
-                        ? round((($data['price_per_unit'] - $data['cost_per_unit']) / $data['cost_per_unit']) * 100, 2)
-                        : null,
-                ]
+                'computed' => $computed,
             ]
         ], Response::HTTP_CREATED);
     }
@@ -176,32 +207,48 @@ class ProductController extends Controller
 
         $data = $request->validated();
 
-        // Recalculate cost per unit if total amount or purchase quantity changes
-        if (isset($data['total_amount_paid']) || isset($data['purchase_quantity'])) {
-            $totalAmount = $data['total_amount_paid'] ?? $product->total_amount_paid;
-            $purchaseQuantity = $data['purchase_quantity'] ?? $product->purchase_quantity;
-            $data['cost_per_unit'] = round($totalAmount / $purchaseQuantity, 2);
-        }
+        $isService = $product->isService();
 
-        // Update low stock threshold if purchase quantity changes and threshold was using default
-        if (isset($data['purchase_quantity']) && $product->low_stock_threshold === ceil($product->purchase_quantity * 0.2)) {
-            $data['low_stock_threshold'] = ceil($data['purchase_quantity'] * 0.2);
-        }
+        // Handle service product updates
+        if ($isService) {
+            // Recalculate service price if duration or rate changes
+            if ((isset($data['service_duration']) || isset($data['hourly_rate'])) && !isset($data['price_per_unit'])) {
+                $duration = $data['service_duration'] ?? $product->service_duration;
+                $rate = $data['hourly_rate'] ?? $product->hourly_rate;
+                if ($duration && $rate) {
+                    $data['price_per_unit'] = round($duration * $rate, 2);
+                }
+            }
+        } else {
+            // Handle physical product updates
+            // Recalculate cost per unit if total amount or purchase quantity changes
+            if (isset($data['total_amount_paid']) || isset($data['purchase_quantity'])) {
+                $totalAmount = $data['total_amount_paid'] ?? $product->total_amount_paid;
+                $purchaseQuantity = $data['purchase_quantity'] ?? $product->purchase_quantity;
+                $data['cost_per_unit'] = round($totalAmount / $purchaseQuantity, 2);
+            }
 
-        // Recalculate price per item if selling individual items and related fields change
-        if (
-            $product->sell_individual_items &&
-            (isset($data['total_amount_paid']) || isset($data['purchase_quantity']) || isset($data['break_down_count_per_unit']))
-        ) {
-            $totalAmount = $data['total_amount_paid'] ?? $product->total_amount_paid;
-            $purchaseQuantity = $data['purchase_quantity'] ?? $product->purchase_quantity;
-            $breakDownCount = $data['break_down_count_per_unit'] ?? $product->break_down_count_per_unit;
+            // Update low stock threshold if purchase quantity changes and threshold was using default
+            if (isset($data['purchase_quantity']) && $product->low_stock_threshold === ceil($product->purchase_quantity * 0.2)) {
+                $data['low_stock_threshold'] = ceil($data['purchase_quantity'] * 0.2);
+            }
 
-            if (!isset($data['price_per_item']) && $breakDownCount) {
-                $totalItems = $purchaseQuantity * $breakDownCount;
-                $data['price_per_item'] = round($totalAmount / $totalItems, 2);
+            // Recalculate price per item if selling individual items and related fields change
+            if (
+                $product->sell_individual_items &&
+                (isset($data['total_amount_paid']) || isset($data['purchase_quantity']) || isset($data['break_down_count_per_unit']))
+            ) {
+                $totalAmount = $data['total_amount_paid'] ?? $product->total_amount_paid;
+                $purchaseQuantity = $data['purchase_quantity'] ?? $product->purchase_quantity;
+                $breakDownCount = $data['break_down_count_per_unit'] ?? $product->break_down_count_per_unit;
+
+                if (!isset($data['price_per_item']) && $breakDownCount) {
+                    $totalItems = $purchaseQuantity * $breakDownCount;
+                    $data['price_per_item'] = round($totalAmount / $totalItems, 2);
+                }
             }
         }
+
         $product->update($data);
 
         // Reload relationships for the response
@@ -394,7 +441,10 @@ class ProductController extends Controller
                     StockAdjustmentType::THEFT->value,
                 ]);
             }])
-            ->where('current_stock', '>', 0)
+            ->where(function($query) {
+                $query->where('current_stock', '>', 0)
+                      ->orWhere('product_type', 'service');
+            })
             ->get();
 
         $totalInventoryValue = 0;

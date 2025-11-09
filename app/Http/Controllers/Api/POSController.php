@@ -21,6 +21,7 @@ use App\Models\StockAdjustment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class POSController extends Controller
@@ -196,8 +197,10 @@ class POSController extends Controller
                     ], Response::HTTP_NOT_FOUND);
                 }
 
-                // Check stock availability
-                if ($settings->track_stock && $product->track_inventory) {
+                // Check stock availability (skip for service products)
+                $isPhysicalProduct = $product->product_type === \App\Enums\ProductType::PHYSICAL;
+
+                if ($isPhysicalProduct && $settings->track_stock && $product->track_inventory) {
                     if (!$settings->allow_negative_stock && $product->current_stock < $itemData['quantity']) {
                         DB::rollBack();
                         return new JsonResponse([
@@ -215,7 +218,7 @@ class POSController extends Controller
                     $newStock = $product->current_stock - $itemData['quantity'];
                     if ($settings->isStockLow($newStock)) {
                         // TODO: Queue low stock notification job
-                        \Log::info("Low stock alert for product: {$product->product_name}, Stock: {$newStock}");
+                        Log::info("Low stock alert for product: {$product->product_name}, Stock: {$newStock}");
                     }
                 }
 
@@ -239,8 +242,8 @@ class POSController extends Controller
                     'profit' => $itemProfit,
                 ]);
 
-                // Update product stock if auto-deduct is enabled
-                if ($settings->auto_deduct_stock_on_sale && $settings->track_stock && $product->track_inventory) {
+                // Update product stock if auto-deduct is enabled (skip for service products)
+                if ($isPhysicalProduct && $settings->auto_deduct_stock_on_sale && $settings->track_stock && $product->track_inventory) {
                     $oldStock = $product->current_stock;
                     $newStock = $oldStock - $itemData['quantity'];
 
@@ -397,6 +400,7 @@ class POSController extends Controller
         $this->authorize('viewAnalytics', [Sale::class, $shop]);
 
         $query = Sale::where('shop_id', $shop->id);
+        $fromDate = $request->fromDate ?? now()->startOfMonth();
         $toDate = $request->toDate ?? now()->endOfMonth();
 
         $sales = Sale::where('shop_id', $shop->id)
@@ -533,10 +537,10 @@ class POSController extends Controller
                 $sale->update(['status' => SaleStatus::PARTIALLY_REFUNDED]);
             }
 
-            // Restock items if requested
+            // Restock items if requested (only for physical products)
             if ($request->restockItems) {
                 foreach ($sale->items as $item) {
-                    if ($item->product && $item->product->track_inventory) {
+                    if ($item->product && $item->product->track_inventory && $item->product->product_type === \App\Enums\ProductType::PHYSICAL) {
                         $product = $item->product;
                         $oldStock = $product->current_stock;
                         $newStock = $oldStock + $item->quantity;

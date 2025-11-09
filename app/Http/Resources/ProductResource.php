@@ -11,45 +11,55 @@ class ProductResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'productType' => [
+                'value' => $this->product_type->value,
+                'label' => $this->product_type->label(),
+                'requiresInventory' => $this->product_type->requiresInventory(),
+            ],
             'productName' => $this->product_name,
             'description' => $this->description,
             'sku' => $this->sku,
             'barcode' => $this->barcode,
-            
-            // Purchase information
+
+            // Purchase information (for physical products)
             'purchaseQuantity' => $this->purchase_quantity,
             'totalAmountPaid' => $this->total_amount_paid,
             'costPerUnit' => $this->cost_per_unit,
-            
+
+            // Service information
+            'serviceDuration' => $this->service_duration,
+            'hourlyRate' => $this->hourly_rate,
+            'servicePrice' => $this->getServicePrice(),
+
             // Unit configuration
-            'unitType' => [
+            'unitType' => $this->unit_type ? [
                 'value' => $this->unit_type->value,
                 'label' => $this->unit_type->label(),
-            ],
+            ] : null,
             'breakDownCountPerUnit' => $this->break_down_count_per_unit,
             'smallItemName' => $this->small_item_name,
-            
+
             // Selling configuration
             'sellWholeUnits' => $this->sell_whole_units,
             'pricePerUnit' => $this->price_per_unit,
             'sellIndividualItems' => $this->sell_individual_items,
             'pricePerItem' => $this->price_per_item,
             'sellInBundles' => $this->sell_in_bundles,
-            
+
             // Stock information
             'currentStock' => $this->current_stock,
             'lowStockThreshold' => $this->low_stock_threshold,
             'isLowStock' => $this->isLowStock(),
             'totalIndividualItems' => $this->getTotalItems(),
             'trackInventory' => $this->track_inventory,
-            
+
             // Media
             'imageUrl' => $this->image_url,
-            
+
             // Relationships
             'category' => new CategoryResource($this->whenLoaded('category')),
             'shop' => new ShopResource($this->whenLoaded('shop')),
-            
+
             // Timestamps
             'createdAt' => $this->created_at?->toIso8601String(),
             'updatedAt' => $this->updated_at?->toIso8601String(),

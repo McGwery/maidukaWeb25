@@ -7,6 +7,8 @@ use App\Http\Requests\CreateSavingsGoalRequest;
 use App\Http\Requests\SavingsDepositRequest;
 use App\Http\Requests\SavingsWithdrawalRequest;
 use App\Http\Requests\UpdateSavingsGoalRequest;
+use App\Http\Requests\UpdateSavingsSettingsRequest;
+use App\Http\Resources\SavingsGoalResource;
 use App\Http\Resources\SavingsTransactionResource;
 use App\Http\Resources\ShopSavingsSettingResource;
 use App\Models\Shop;
@@ -236,7 +238,7 @@ class SavingsController extends Controller
     }
 
     /**
-     * Get savings transactions
+     * Get savings transactions history
      */
     public function getTransactions(Request $request): JsonResponse
     {
@@ -251,7 +253,7 @@ class SavingsController extends Controller
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
-        Gate::authorize('viewTransactions', [SavingsPolicy::class, $shop]);
+        Gate::authorize('view', [SavingsPolicy::class, $shop]);
 
         $type = $request->query('type'); // 'deposit', 'withdrawal', or null for all
         $limit = $request->query('limit', 50);
@@ -353,9 +355,9 @@ class SavingsController extends Controller
     }
 
     /**
-     * Make a savings withdrawal
+     * Create a new savings goal
      */
-    public function withdraw(SavingsWithdrawalRequest $request): JsonResponse
+    public function createGoal(CreateSavingsGoalRequest $request): JsonResponse
     {
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
@@ -368,7 +370,7 @@ class SavingsController extends Controller
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
-        Gate::authorize('withdraw', [SavingsPolicy::class, $shop]);
+        Gate::authorize('manageSettings', [SavingsPolicy::class, $shop]);
 
         $validated = $request->validated();
 
@@ -387,20 +389,14 @@ class SavingsController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Savings goal created successfully',
-            'data' => [
-                'id' => $goal->id,
-                'name' => $goal->name,
-                'targetAmount' => (float) $goal->target_amount,
-                'currentAmount' => (float) $goal->current_amount,
-                'progressPercentage' => $goal->progress_percentage,
-            ],
+            'data' => new SavingsGoalResource($goal),
         ], 201);
     }
 
     /**
-     * Create a savings goal
+     * Get all savings goals for the shop
      */
-    public function createGoal(CreateSavingsGoalRequest $request): JsonResponse
+    public function getGoals(Request $request): JsonResponse
     {
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
@@ -413,9 +409,9 @@ class SavingsController extends Controller
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
-        Gate::authorize('manageGoals', [SavingsPolicy::class, $shop]);
+        Gate::authorize('view', [SavingsPolicy::class, $shop]);
 
-        $status = $request->query('status'); // 'active', 'completed', 'cancelled', 'paused'
+        $status = $request->query('status'); // 'active', 'completed', 'cancelled', or null for all
 
         $query = SavingsGoal::where('shop_id', $shopId);
 
@@ -424,6 +420,7 @@ class SavingsController extends Controller
         }
 
         $goals = $query->orderBy('priority', 'desc')
+            ->orderBy('target_date', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -463,12 +460,7 @@ class SavingsController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Savings goal updated successfully',
-            'data' => [
-                'id' => $goal->id,
-                'name' => $goal->name,
-                'progressPercentage' => $goal->progress_percentage,
-                'status' => $goal->status,
-            ],
+            'data' => new SavingsGoalResource($goal),
         ]);
     }
 
