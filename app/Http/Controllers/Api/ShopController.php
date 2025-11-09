@@ -8,8 +8,10 @@ use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Http\Resources\ShopResource;
 use App\Models\Category;
 use App\Models\Shop;
+use App\Models\ShopSettings;
 use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class ShopController extends Controller
@@ -50,21 +52,41 @@ class ShopController extends Controller
     {
         $this->initRequestTime();
 
-        $shop = Shop::create([
-            ...$request->validated(),
-            'owner_id' => auth()->id(),
-        ]);
+        try {
+            DB::beginTransaction();
 
-        // Make this the active shop for the user if they don't have one
-        if (!auth()->user()->activeShop) {
-            auth()->user()->switchShop($shop);
+            $shop = Shop::create([
+                ...$request->validated(),
+                'owner_id' => auth()->id(),
+            ]);
+
+            // Create shop settings with defaults
+            ShopSettings::create(array_merge(
+                ['shop_id' => $shop->id],
+                ShopSettings::defaults()
+            ));
+
+            // Make this the active shop for the user if they don't have one
+            if (!auth()->user()->activeShop) {
+                auth()->user()->switchShop($shop);
+            }
+
+            DB::commit();
+
+            return $this->successResponse(
+                'Shop created successfully.',
+                ['shop' => new ShopResource($shop->load('owner'))],
+                Response::HTTP_CREATED
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return $this->errorResponse(
+                'Failed to create shop.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
-
-        return $this->successResponse(
-            'Shop created successfully.',
-            ['shop' => new ShopResource($shop->load('owner'))],
-            Response::HTTP_CREATED
-        );
     }
 
     /**

@@ -31,8 +31,8 @@ return new class extends Migration
             $table->enum('placement', ['home', 'products', 'sales', 'reports', 'all'])->default('home');
 
             // Scheduling
-            $table->timestamp('starts_at');
-            $table->timestamp('expires_at');
+            $table->timestamp('starts_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
             $table->boolean('is_active')->default(true);
 
             // Budget & Billing

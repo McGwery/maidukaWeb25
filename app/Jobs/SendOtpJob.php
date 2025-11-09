@@ -39,8 +39,7 @@ class SendOtpJob implements ShouldQueue
                 'reset_password' => "Namba yako ya uthibitisho wa kubadilisha nywila ni {$this->otp->code}.",
                 default => "Namba yako ya uthibitisho ni {$this->otp->code}.",
             };
-            logger($text);
-            // Beem::sms($text, [$senderPhone], "MaiDuka");
+             Beem::sms($text, [$senderPhone], "MaiDuka");
         } catch (\Throwable $th) {
             logger($th->getMessage());
         }

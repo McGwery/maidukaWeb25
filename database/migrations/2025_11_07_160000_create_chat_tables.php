@@ -89,7 +89,7 @@ return new class extends Migration
             $table->foreignUuid('shop_id')->constrained()->cascadeOnDelete();
             $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
             $table->timestamp('started_at');
-            $table->timestamp('expires_at');
+            $table->timestamp('expires_at')->nullable();
 
             $table->timestamps();
 

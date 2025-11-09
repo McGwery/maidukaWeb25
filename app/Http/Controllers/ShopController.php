@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\CreateShopRequest;
+use App\Http\Requests\Shop\CreateShopRequest;
 use App\Http\Resources\ShopResource;
 use App\Models\ActiveShop;
 use App\Models\Shop;
@@ -15,7 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ShopController extends Controller
 {
     use AuthorizesRequests;
-    
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $shops = Shop::query()
@@ -41,7 +41,7 @@ class ShopController extends Controller
     public function show(Shop $shop): ShopResource
     {
         $this->authorize('view', $shop);
-        
+
         return new ShopResource($shop->load('owner'));
     }
 
