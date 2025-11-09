@@ -41,6 +41,8 @@ class ShopMemberController extends Controller
     {
         $this->initRequestTime();
 
+        $this->authorize('create', $shop);
+
         $role = ShopMemberRole::from($request->input('role'));
 
         // Check if user is already a member
@@ -72,7 +74,7 @@ class ShopMemberController extends Controller
     {
         $this->initRequestTime();
 
-        $this->authorize('view', $shop);
+        $this->authorize('view', $member);
 
         if ($member->shop_id !== $shop->id) {
             return $this->errorResponse(
@@ -91,6 +93,8 @@ class ShopMemberController extends Controller
     public function update(ShopMemberRequest $request, Shop $shop, ShopMember $member): JsonResponse
     {
         $this->initRequestTime();
+
+        $this->authorize('update', $member);
 
         if ($member->shop_id !== $shop->id) {
             return $this->errorResponse(
@@ -126,7 +130,7 @@ class ShopMemberController extends Controller
     {
         $this->initRequestTime();
 
-        $this->authorize('manage-members', $shop);
+        $this->authorize('delete', $member);
 
         if ($member->shop_id !== $shop->id) {
             return $this->errorResponse(

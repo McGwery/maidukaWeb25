@@ -18,6 +18,7 @@ use App\Policies\CustomerPolicy;
 use App\Policies\ExpensePolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\PurchaseOrderPolicy;
+use App\Policies\ReportPolicy;
 use App\Policies\SalePolicy;
 use App\Policies\ShopMemberPolicy;
 use App\Policies\ShopPolicy;
@@ -31,7 +32,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        Shop::class => ShopPolicy::class,
+        Shop::class => [ShopPolicy::class, ReportPolicy::class],
         Product::class => ProductPolicy::class,
         Sale::class => SalePolicy::class,
         Customer::class => CustomerPolicy::class,

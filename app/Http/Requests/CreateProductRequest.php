@@ -95,18 +95,9 @@ class CreateProductRequest extends FormRequest
             'track_inventory' => ['boolean'],
 
             // Media
-            'image_url' => ['nullable', 'url'],
+            'image_url' => ['nullable', 'url']
+];
 
-            // Shop association
-            'shop_id' => [
-                'required',
-                'uuid',
-                Rule::exists('shops', 'id')->where(function ($query) {
-                    $query->where('id', $this->shop_id)
-                          ->where('is_active', true);
-                })
-            ],
-        ];
     }
 
     protected function prepareForValidation(): void

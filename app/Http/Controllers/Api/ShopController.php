@@ -6,9 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Shop\CreateShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Http\Resources\ShopResource;
-use App\Models\Category;
 use App\Models\Shop;
 use App\Models\ShopSettings;
+use App\Models\Subscription;
+use App\Enums\SubscriptionPlan;
+use App\Enums\SubscriptionStatus;
+use App\Enums\SubscriptionType;
+use App\Enums\Currency;
 use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -27,18 +31,16 @@ class ShopController extends Controller
 
         $user = auth()->user();
 
-
         $shops = $user->ownedShops()
-            ->with('owner')
+            ->with(['owner', 'activeSubscription'])
             ->get()
-            ->union($user->memberShops()->with('owner')->get())
+            ->union($user->memberShops()->with(['owner', 'activeSubscription'])->get())
             ->values();
-
         return $this->successResponse(
             'Shops retrieved successfully.',
             [
                 'shops' => ShopResource::collection($shops),
-                'activeShop' => $user->activeShop ? new ShopResource($user->activeShop->shop) : null,
+                'activeShop' => $user->activeShop ? new ShopResource($user->activeShop?->shop?->load('activeSubscription')) : null,
                 'totalShops' => $shops->count(),
                 'activeShops' => $shops->where('status', 'active')->count(),
             ]
@@ -66,6 +68,26 @@ class ShopController extends Controller
                 ShopSettings::defaults()
             ));
 
+            // Create PREMIUM subscription for the new shop
+            $premiumPlan = SubscriptionPlan::PREMIUM;
+            $subscription = Subscription::create([
+                'shop_id' => $shop->id,
+                'plan' => $premiumPlan,
+                'type' => SubscriptionType::BOTH,
+                'status' => SubscriptionStatus::ACTIVE,
+                'price' => $premiumPlan->price(),
+                'currency' => $shop->currency ?? Currency::TZS,
+                'starts_at' => now(),
+                'expires_at' => now()->addDays($premiumPlan->durationDays()),
+                'auto_renew' => false,
+                'payment_method' => 'free_trial',
+                'transaction_reference' => 'SHOP_CREATION_' . strtoupper(uniqid()),
+                'features' => $premiumPlan->features(),
+                'max_users' => 10,
+                'max_products' => null, // Unlimited
+                'notes' => 'Premium subscription activated on shop creation',
+            ]);
+
             // Make this the active shop for the user if they don't have one
             if (!auth()->user()->activeShop) {
                 auth()->user()->switchShop($shop);
@@ -74,8 +96,8 @@ class ShopController extends Controller
             DB::commit();
 
             return $this->successResponse(
-                'Shop created successfully.',
-                ['shop' => new ShopResource($shop->load('owner'))],
+                'Shop created successfully with Premium subscription.',
+                ['shop' => new ShopResource($shop->load(['owner', 'activeSubscription']))],
                 Response::HTTP_CREATED
             );
         } catch (\Exception $e) {
@@ -106,7 +128,7 @@ class ShopController extends Controller
 
         return $this->successResponse(
             'Shop retrieved successfully.',
-            ['shop' => new ShopResource($shop->load(['owner', 'members']))]
+            ['shop' => new ShopResource($shop->load(['owner', 'members', 'activeSubscription']))]
         );
     }
 
@@ -129,7 +151,7 @@ class ShopController extends Controller
 
         return $this->successResponse(
             'Shop updated successfully.',
-            ['shop' => new ShopResource($shop->load('owner'))]
+            ['shop' => new ShopResource($shop->load(['owner', 'activeSubscription']))]
         );
     }
 
@@ -138,6 +160,14 @@ class ShopController extends Controller
         $this->initRequestTime();
 
         $this->authorize('delete', $shop);
+
+        if($shop->activeShop()->exists()){
+            return $this->errorResponse(
+                'Cannot delete the shop while it is set as active for a user.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
+        }
 
         $shop->delete();
 
@@ -156,7 +186,7 @@ class ShopController extends Controller
 
             return $this->successResponse(
                 'Successfully switched to ' . $shop->name . '.',
-                ['shop' => new ShopResource($shop->load('owner'))]
+                ['shop' => new ShopResource($shop->load(['owner', 'activeSubscription']))]
             );
         } catch (\Exception $e) {
             return $this->errorResponse(
@@ -187,7 +217,7 @@ class ShopController extends Controller
 
         return $this->successResponse(
             'Shop status updated successfully.',
-            ['shop' => new ShopResource($shop->load('owner'))]
+            ['shop' => new ShopResource($shop->load(['owner', 'activeSubscription']))]
         );
     }
 

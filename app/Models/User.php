@@ -54,8 +54,6 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
             'is_phone_login_enabled' => 'boolean',
-            'phone_verified_at' => 'datetime',
-            'is_phone_login_enabled' => 'boolean',
             'password' => 'hashed',
         ];
     }
@@ -85,7 +83,7 @@ class User extends Authenticatable
         $this->otps()->where('type', $type)->delete();
 
         $generatedOtp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-       
+
         $otp =  $this->otps()->create([
             'phone' => $this->phone,
             'code' => $generatedOtp,
@@ -173,7 +171,7 @@ class User extends Authenticatable
      */
     public function canAccessShop(Shop $shop): bool
     {
-        return $shop->isOwner($this) || 
+        return $shop->isOwner($this) ||
                $shop->members()->where('user_id', $this->id)
                     ->where('is_active', true)
                     ->exists();

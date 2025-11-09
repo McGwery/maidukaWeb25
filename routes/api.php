@@ -267,14 +267,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/search-shops', [ChatController::class, 'searchShops']);
         });
 
+
+        // Ads Feed (Deals Tab) - Outside shop context
+        Route::get('/ads/feed', [AdController::class, 'feed']);
+
+        // Subscription Plans (outside shop context)
+        Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
+
+        // Settings Categories (outside shop context)
+        Route::get('/settings/categories', [ShopSettingsController::class, 'categories']);
+
     });
-
-    // Ads Feed (Deals Tab) - Outside shop context
-    Route::get('/ads/feed', [AdController::class, 'feed']);
-
-    // Subscription Plans (outside shop context)
-    Route::get('/subscription-plans', [SubscriptionController::class, 'plans']);
-
-    // Settings Categories (outside shop context)
-    Route::get('/settings-categories', [ShopSettingsController::class, 'categories']);
 });

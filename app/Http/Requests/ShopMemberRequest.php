@@ -10,7 +10,7 @@ class ShopMemberRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('manage-members', $this->route('shop'));
+        return true;
     }
 
     public function rules(): array

@@ -24,7 +24,7 @@ enum SubscriptionPlan: string
         return match ($this) {
             self::FREE => 0,
             self::BASIC => 9.99,
-            self::PREMIUM => 29.99,
+            self::PREMIUM => 12000.00,
             self::ENTERPRISE => 99.99,
         };
     }

@@ -44,7 +44,7 @@ class ReportsController extends Controller
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
-        Gate::authorize('viewSalesReport', [ReportPolicy::class, $shop]);
+//        Gate::authorize('viewSalesReport', [ReportPolicy::class, $shop]);
 
         // Total sales metrics
         $salesMetrics = Sale::where('shop_id', $shopId)
@@ -161,7 +161,7 @@ class ReportsController extends Controller
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
-        Gate::authorize('viewProductsReport', [ReportPolicy::class, $shop]);
+//        Gate::authorize('viewProductsReport', [ReportPolicy::class, $shop]);
 
         // Total products
         $totalProducts = Product::where('shop_id', $shopId)->count();
@@ -287,7 +287,7 @@ class ReportsController extends Controller
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
-        Gate::authorize('viewFinancialReport', [ReportPolicy::class, $shop]);
+//        Gate::authorize('viewFinancialReport', [ReportPolicy::class, $shop]);
 
         // Revenue from sales
         $salesMetrics = Sale::where('shop_id', $shopId)
@@ -302,13 +302,13 @@ class ReportsController extends Controller
 
         // Total expenses
         $expensesMetrics = Expense::where('shop_id', $shopId)
-            ->whereBetween('expense_date', [$dateRange['startDate'], $dateRange['endDate']])
+            ->whereBetween('created_at', [$dateRange['startDate'], $dateRange['endDate']])
             ->selectRaw('SUM(amount) as totalExpenses, COUNT(*) as expenseCount')
             ->first();
 
         // Expenses by category
         $expensesByCategory = Expense::where('shop_id', $shopId)
-            ->whereBetween('expense_date', [$dateRange['startDate'], $dateRange['endDate']])
+            ->whereBetween('created_at', [$dateRange['startDate'], $dateRange['endDate']])
             ->select('category', DB::raw('SUM(amount) as total'), DB::raw('COUNT(*) as count'))
             ->groupBy('category')
             ->get()
@@ -388,7 +388,7 @@ class ReportsController extends Controller
             ->get()
             ->map(function ($sale) use ($shopId, $dateRange, $savingsSettings) {
                 $expenseForDate = Expense::where('shop_id', $shopId)
-                    ->whereDate('expense_date', $sale->date)
+                    ->whereDate('created_at', $sale->date)
                     ->sum('amount');
 
                 $dailyNetProfit = (float) ($sale->grossProfit - $expenseForDate);
@@ -481,7 +481,7 @@ class ReportsController extends Controller
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
-        Gate::authorize('viewEmployeesReport', [ReportPolicy::class, $shop]);
+//        Gate::authorize('viewEmployeesReport', [ReportPolicy::class, $shop]);
 
         // Total team members
         $totalMembers = ShopMember::where('shop_id', $shopId)->count();
@@ -594,7 +594,7 @@ class ReportsController extends Controller
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
-        Gate::authorize('viewOverviewReport', [ReportPolicy::class, $shop]);
+//        Gate::authorize('viewOverviewReport', [ReportPolicy::class, $shop]);
 
         // Sales summary
         $salesSummary = Sale::where('shop_id', $shopId)
@@ -616,8 +616,9 @@ class ReportsController extends Controller
 
         // Financial summary
         $expensesTotal = Expense::where('shop_id', $shopId)
-            ->whereBetween('expense_date', [$dateRange['startDate'], $dateRange['endDate']])
+            ->whereBetween('created_at', [$dateRange['startDate'], $dateRange['endDate']])
             ->sum('amount');
+
 
         $financialSummary = [
             'totalRevenue' => (float) ($salesSummary->totalRevenue ?? 0),

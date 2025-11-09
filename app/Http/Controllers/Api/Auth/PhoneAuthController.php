@@ -145,7 +145,7 @@ class PhoneAuthController extends Controller
 
         $user = User::where('phone', $request->phone)
             ->with(['activeShop.shop' => function($query) {
-                $query->with('owner');
+                $query->with(['owner','activeSubscription']);
             }])
             ->first();
 

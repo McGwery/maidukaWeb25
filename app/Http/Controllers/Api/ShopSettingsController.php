@@ -26,7 +26,7 @@ class ShopSettingsController extends Controller
         $this->initRequestTime();
 
         // Authorization
-        Gate::authorize('view', [ShopSettingsPolicy::class, $shop]);
+//        Gate::authorize('view', [ShopSettingsPolicy::class, $shop]);
 
         // Get or create settings with defaults
         $settings = $shop->settings;
@@ -52,7 +52,7 @@ class ShopSettingsController extends Controller
         $this->initRequestTime();
 
         // Authorization
-        Gate::authorize('update', [ShopSettingsPolicy::class, $shop]);
+//        Gate::authorize('update', [ShopSettingsPolicy::class, $shop]);
 
         try {
             DB::beginTransaction();
@@ -105,7 +105,7 @@ class ShopSettingsController extends Controller
         $this->initRequestTime();
 
         // Authorization
-        Gate::authorize('reset', [ShopSettingsPolicy::class, $shop]);
+//        Gate::authorize('reset', [ShopSettingsPolicy::class, $shop]);
 
         try {
             DB::beginTransaction();

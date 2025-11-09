@@ -87,26 +87,7 @@ enum ShopMemberRole: string
                 'view_conversations',
                 'send_messages',
             ],
-            self::CASHIER => [
-                // Sales & POS
-                'process_sales',
-                'view_sales',
-                'view_sales_analytics',
-
-                // Customers
-                'manage_customers',
-                'view_customers',
-
-                // Inventory (view only)
-                'view_inventory',
-                'view_products',
-
-                // Chat
-                'use_chat',
-                'view_conversations',
-                'send_messages',
-            ],
-            self::SALES => [
+            self::CASHIER, self::SALES => [
                 // Sales & POS
                 'process_sales',
                 'view_sales',

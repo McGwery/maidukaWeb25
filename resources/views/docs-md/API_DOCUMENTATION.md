@@ -368,13 +368,15 @@ Logout and revoke access token.
 
 ## Shop Management
 
+**Note:** All shop endpoints automatically include active subscription information when available. This includes subscription plan, expiry date, days remaining, and whether the subscription is expiring soon.
+
 ### Get All Shops
 
 **GET** `/api/shops`
 
 🔒 **Authentication Required**
 
-Get all shops owned by or accessible to the authenticated user.
+Get all shops owned by or accessible to the authenticated user. Each shop includes its active subscription details.
 
 **Response:** `200 OK`
 ```json
@@ -387,26 +389,51 @@ Get all shops owned by or accessible to the authenticated user.
       {
         "id": 1,
         "name": "My Retail Shop",
-        "type": "retail",
-        "description": "General retail store",
-        "phone": "+255712345678",
-        "email": "shop@example.com",
-        "address": "123 Main St",
-        "city": "Dar es Salaam",
-        "region": "Dar es Salaam",
-        "country": "Tanzania",
-        "status": "active",
+        "businessType": {
+          "value": "retail",
+          "label": "Retail Store"
+        },
+        "phoneNumber": "+255712345678",
+        "address": "123 Main St, Dar es Salaam",
+        "agentCode": "AGENT001",
+        "currency": {
+          "code": "TZS",
+          "symbol": "TSh",
+          "label": "Tanzanian Shilling"
+        },
+        "imageUrl": "https://example.com/shop-image.jpg",
+        "isActive": true,
+        "isCurrentSelected": true,
         "owner": {
           "id": 1,
           "name": "John Doe",
           "phone": "+255712345678"
         },
-        "createdAt": "2025-01-15T10:00:00.000000Z"
+        "activeSubscription": {
+          "id": "uuid-123",
+          "plan": "pro",
+          "planLabel": "Pro Plan",
+          "type": "monthly",
+          "expiresAt": "2025-12-09T10:00:00.000000Z",
+          "daysRemaining": 30,
+          "isExpiringSoon": false
+        },
+        "createdAt": "2025-01-15T10:00:00.000000Z",
+        "updatedAt": "2025-11-01T08:30:00.000000Z"
       }
     ],
     "activeShop": {
       "id": 1,
-      "name": "My Retail Shop"
+      "name": "My Retail Shop",
+      "activeSubscription": {
+        "id": "uuid-123",
+        "plan": "pro",
+        "planLabel": "Pro Plan",
+        "type": "monthly",
+        "expiresAt": "2025-12-09T10:00:00.000000Z",
+        "daysRemaining": 30,
+        "isExpiringSoon": false
+      }
     },
     "totalShops": 3,
     "activeShops": 2
@@ -422,7 +449,7 @@ Get all shops owned by or accessible to the authenticated user.
 
 🔒 **Authentication Required**
 
-Create a new shop.
+Create a new shop. **A Premium subscription (30 days) is automatically activated for all new shops.**
 
 **Request Body:**
 ```json
@@ -450,14 +477,28 @@ Create a new shop.
 ```json
 {
   "success": true,
-  "message": "Shop created successfully.",
+  "message": "Shop created successfully with Premium subscription.",
   "responseTime": 67.89,
   "data": {
     "shop": {
       "id": 2,
       "name": "New Shop Name",
-      "type": "retail",
-      "status": "active"
+      "businessType": {
+        "value": "retail",
+        "label": "Retail Store"
+      },
+      "phoneNumber": "+255712345678",
+      "isActive": true,
+      "activeSubscription": {
+        "id": "subscription-uuid",
+        "plan": "premium",
+        "planLabel": "Premium Plan",
+        "type": "both",
+        "expiresAt": "2025-12-09T10:00:00.000000Z",
+        "daysRemaining": 30,
+        "isExpiringSoon": false
+      },
+      "createdAt": "2025-11-09T10:00:00.000000Z"
     }
   }
 }

@@ -731,7 +731,7 @@ class POSController extends Controller
         // Authorization
         $this->authorize('create', [Customer::class, $shop]);
 
-        $customer = Customer::create([
+        $customer = Customer::firstOrCreate([
             'shop_id' => $shop->id,
             'name' => $request->name,
             'phone' => $request->phone,

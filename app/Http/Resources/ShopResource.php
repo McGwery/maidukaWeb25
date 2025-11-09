@@ -60,6 +60,8 @@ class ShopResource extends JsonResource
                     'type' => $this->activeSubscription->type->value,
                     'expiresAt' => $this->activeSubscription->expires_at?->toIso8601String(),
                     'daysRemaining' => $this->activeSubscription->daysRemaining(),
+                    'isActive' => $this->activeSubscription->isActive(),
+                    'isExpired' => $this->activeSubscription->isExpired(),
                     'isExpiringSoon' => $this->activeSubscription->isExpiringSoon(),
                 ] : null;
             }),
