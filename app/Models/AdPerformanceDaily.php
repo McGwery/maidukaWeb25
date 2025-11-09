@@ -10,6 +10,8 @@ class AdPerformanceDaily extends Model
 {
     use HasUuid;
 
+    protected $table = 'ad_performance_daily';
+
     protected $fillable = [
         'ad_id',
         'date',

@@ -12,7 +12,7 @@ class AdResource extends JsonResource
         return [
             'id' => $this->id,
             'shopId' => $this->shop_id,
-            'shop' => $this->when($this->relationLoaded('shop'), function() {
+            'shop' => $this->when($this->relationLoaded('shop') && $this->shop, function() {
                 return [
                     'id' => $this->shop->id,
                     'name' => $this->shop->name,

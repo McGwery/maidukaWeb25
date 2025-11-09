@@ -203,7 +203,7 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         // Ads & Promotions
-        Route::group(['prefix' => 'ads'], function () {
+        Route::group(['prefix' => 'manage/ads'], function () {
             // Get all ads for shop
             Route::get('/', [AdController::class, 'index']);
 
