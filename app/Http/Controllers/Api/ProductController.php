@@ -12,17 +12,22 @@ use App\Http\Resources\StockAdjustmentResource;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\StockAdjustment;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class ProductController extends Controller
 {
+    use HasStandardResponse;
+
     /**
      * Display a listing of products for the specified shop.
      */
     public function index(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewAny', [Product::class, $shop]);
 
@@ -56,19 +61,12 @@ class ProductController extends Controller
             })
             ->paginate($request->per_page ?? 15);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'products' => ProductResource::collection($products),
-                'pagination' => [
-                    'total' => $products->total(),
-                    'currentPage' => $products->currentPage(),
-                    'lastPage' => $products->lastPage(),
-                    'perPage' => $products->perPage(),
-                ]
-            ]
-        ]);
+        $transformedProducts = $products->setCollection(collect(ProductResource::collection($products->getCollection())));
+
+        return $this->paginatedResponse(
+            'Products retrieved successfully.',
+            $transformedProducts
+        );
     }
 
     /**
@@ -76,6 +74,8 @@ class ProductController extends Controller
      */
     public function store(CreateProductRequest $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('create', [Product::class, $shop]);
 
@@ -145,15 +145,14 @@ class ProductController extends Controller
             ];
         }
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_CREATED,
-            'message' => $isService ? 'Service added successfully' : 'Product added successfully',
-            'data' => [
+        return $this->successResponse(
+            $isService ? 'Service added successfully.' : 'Product added successfully.',
+            [
                 'product' => new ProductResource($product),
                 'computed' => $computed,
-            ]
-        ], Response::HTTP_CREATED);
+            ],
+            Response::HTTP_CREATED
+        );
     }
 
     /**
@@ -161,22 +160,25 @@ class ProductController extends Controller
      */
     public function show(Shop $shop, Product $product): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('view', $product);
 
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'message' => 'Product not found in this shop.'
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Product not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $product->load(['category', 'shop']);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Product retrieved successfully.',
+            [
                 'product' => new ProductResource($product),
                 'computed' => [
                     'profitMarginPerUnit' => $product->price_per_unit
@@ -187,7 +189,7 @@ class ProductController extends Controller
                         : null,
                 ]
             ]
-        ]);
+        );
     }
 
     /**
@@ -195,14 +197,18 @@ class ProductController extends Controller
      */
     public function update(UpdateProductRequest $request, Shop $shop, Product $product): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('update', $product);
 
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'message' => 'Product not found in this shop.'
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Product not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $data = $request->validated();
@@ -254,11 +260,9 @@ class ProductController extends Controller
         // Reload relationships for the response
         $product->load(['category', 'shop']);
 
-        return new JsonResponse([
-            'success' => true,
-            'message' => 'Product updated successfully',
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Product updated successfully.',
+            [
                 'product' => new ProductResource($product),
                 'computed' => [
                     'suggestedLowStockThreshold' => ceil($product->purchase_quantity * 0.2),
@@ -274,7 +278,7 @@ class ProductController extends Controller
                         : null,
                 ]
             ]
-        ]);
+        );
     }
 
     /**
@@ -282,26 +286,23 @@ class ProductController extends Controller
      */
     public function destroy(Request $request, Shop $shop, Product $product): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('delete', $product);
 
         // Check if product belongs to this shop
-
-        // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
-            return new JsonResponse([
-                 'success' => false,
-                'message' => 'Product not found in this shop.'
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Product not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $product->delete();
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'message' => 'Product deleted successfully'
-        ]);
+        return $this->successResponse('Product deleted successfully.');
     }
 
     /**
@@ -309,15 +310,18 @@ class ProductController extends Controller
      */
     public function updateStock(StockAdjustmentRequest $request, Shop $shop, Product $product): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('updateStock', $product);
 
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Product not found in this shop.'
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Product not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $oldStock = $product->current_stock;
@@ -325,10 +329,11 @@ class ProductController extends Controller
         $newStock = $oldStock + $quantity;
 
         if ($newStock < 0) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Stock cannot be reduced below zero. Current stock: ' . $oldStock
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(
+                'Stock cannot be reduced below zero. Current stock: ' . $oldStock,
+                null,
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         // Create stock adjustment record
@@ -349,15 +354,13 @@ class ProductController extends Controller
             'current_stock' => $newStock
         ]);
 
-        return new JsonResponse([
-            'success' => true,
-            'message' => 'Stock adjusted successfully',
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Stock adjusted successfully.',
+            [
                 'product' => new ProductResource($product->fresh()),
                 'adjustment' => new StockAdjustmentResource($adjustment),
             ]
-        ]);
+        );
     }
 
     /**
@@ -365,15 +368,18 @@ class ProductController extends Controller
      */
     public function stockAdjustmentHistory(Request $request, Shop $shop, Product $product): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewStockAdjustments', [Product::class, $shop]);
 
         // Check if product belongs to this shop
         if ($product->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Product not found in this shop.'
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Product not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $adjustments = $product->stockAdjustments()
@@ -400,24 +406,19 @@ class ProductController extends Controller
             ->get()
             ->sum(fn($adj) => $adj->getMonetaryImpact());
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'adjustments' => StockAdjustmentResource::collection($adjustments),
+        $transformedAdjustments = $adjustments->setCollection(collect(StockAdjustmentResource::collection($adjustments->getCollection())));
+
+        return $this->paginatedResponse(
+            'Stock adjustment history retrieved successfully.',
+            $transformedAdjustments,
+            [
                 'summary' => [
                     'totalReductions' => $product->stockAdjustments()->where('quantity', '<', 0)->sum('quantity'),
                     'totalAdditions' => $product->stockAdjustments()->where('quantity', '>', 0)->sum('quantity'),
                     'totalLossesValue' => $totalLosses,
                 ],
-                'pagination' => [
-                    'total' => $adjustments->total(),
-                    'currentPage' => $adjustments->currentPage(),
-                    'lastPage' => $adjustments->lastPage(),
-                    'perPage' => $adjustments->perPage(),
-                ]
             ]
-        ]);
+        );
     }
 
     /**
@@ -425,6 +426,8 @@ class ProductController extends Controller
      */
     public function inventoryAnalysis(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewInventoryAnalysis', [Product::class, $shop]);
 
@@ -484,10 +487,9 @@ class ProductController extends Controller
             ? ($totalExpectedProfit / $totalInventoryValue) * 100
             : 0;
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Inventory analysis retrieved successfully.',
+            [
                 'summary' => [
                     'totalInventoryValue' => round($totalInventoryValue, 2),
                     'totalExpectedRevenue' => round($totalExpectedRevenue, 2),
@@ -501,7 +503,7 @@ class ProductController extends Controller
                 ],
                 'products' => $request->include_products ? $productAnalysis : null,
             ]
-        ]);
+        );
     }
 
     /**
@@ -509,6 +511,8 @@ class ProductController extends Controller
      */
     public function adjustmentsSummary(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewStockAdjustments', [Product::class, $shop]);
 
@@ -552,19 +556,12 @@ class ProductController extends Controller
             ];
         }
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'adjustments' => StockAdjustmentResource::collection($adjustments),
-                'summaryByType' => $summaryByType,
-                'pagination' => [
-                    'total' => $adjustments->total(),
-                    'currentPage' => $adjustments->currentPage(),
-                    'lastPage' => $adjustments->lastPage(),
-                    'perPage' => $adjustments->perPage(),
-                ]
-            ]
-        ]);
+        $transformedAdjustments = $adjustments->setCollection(collect(StockAdjustmentResource::collection($adjustments->getCollection())));
+
+        return $this->paginatedResponse(
+            'Stock adjustments summary retrieved successfully.',
+            $transformedAdjustments,
+            ['summaryByType' => $summaryByType]
+        );
     }
 }

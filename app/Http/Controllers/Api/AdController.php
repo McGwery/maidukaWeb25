@@ -15,6 +15,7 @@ use App\Models\AdConversion;
 use App\Models\AdPerformanceDaily;
 use App\Models\AdView;
 use App\Models\Shop;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,12 +23,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdController extends Controller
 {
+    use HasStandardResponse;
     /**
      * Get ads feed for mobile app (Deals tab).
      * Personalized based on user's shop.
      */
     public function feed(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $user = $request->user();
         $shopId = $request->query('shopId');
 
@@ -35,11 +39,11 @@ class AdController extends Controller
         $shop = $shopId ? Shop::find($shopId) : $user->shops()->first();
 
         if (!$shop) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_BAD_REQUEST,
-                'message' => 'No shop found for user.',
-            ], Response::HTTP_BAD_REQUEST);
+            return $this->errorResponse(
+                'No shop found for user.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Get personalized ads
@@ -49,24 +53,19 @@ class AdController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate($request->perPage ?? 20);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'ads' => AdResource::collection($ads),
-                'pagination' => [
-                    'total' => $ads->total(),
-                    'currentPage' => $ads->currentPage(),
-                    'lastPage' => $ads->lastPage(),
-                    'perPage' => $ads->perPage(),
-                ],
+        $transformedAds = $ads->setCollection(collect(AdResource::collection($ads->getCollection())));
+
+        return $this->paginatedResponse(
+            'Ads retrieved successfully.',
+            $transformedAds,
+            [
                 'shopInfo' => [
                     'id' => $shop->id,
                     'name' => $shop->name,
                     'businessType' => $shop->business_type->value,
                 ],
             ]
-        ], Response::HTTP_OK);
+        );
     }
 
     /**
@@ -74,6 +73,8 @@ class AdController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $user = $request->user();
         $shopId = $request->query('shopId');
 
@@ -119,19 +120,12 @@ class AdController extends Controller
 
         $ads = $query->paginate($request->perPage ?? 15);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'ads' => AdResource::collection($ads),
-                'pagination' => [
-                    'total' => $ads->total(),
-                    'currentPage' => $ads->currentPage(),
-                    'lastPage' => $ads->lastPage(),
-                    'perPage' => $ads->perPage(),
-                ],
-            ]
-        ], Response::HTTP_OK);
+        $transformedAds = $ads->setCollection(collect(AdResource::collection($ads->getCollection())));
+
+        return $this->paginatedResponse(
+            'Ads retrieved successfully.',
+            $transformedAds
+        );
     }
 
     /**
@@ -139,6 +133,8 @@ class AdController extends Controller
      */
     public function store(StoreAdRequest $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $user = $request->user();
         $data = $request->validated();
 
@@ -159,11 +155,11 @@ class AdController extends Controller
                 $activeSubscription = $shop->activeSubscription;
                 if (!$activeSubscription) {
                     DB::rollBack();
-                    return new JsonResponse([
-                        'success' => false,
-                        'code' => Response::HTTP_FORBIDDEN,
-                        'message' => 'Active subscription required to create ads.',
-                    ], Response::HTTP_FORBIDDEN);
+                    return $this->errorResponse(
+                        'Active subscription required to create ads.',
+                        null,
+                        Response::HTTP_FORBIDDEN
+                    );
                 }
 
                 // Check monthly ad limit (at least 1 ad per month)
@@ -177,15 +173,14 @@ class AdController extends Controller
 
                 if ($currentMonthAds >= $adLimit) {
                     DB::rollBack();
-                    return new JsonResponse([
-                        'success' => false,
-                        'code' => Response::HTTP_FORBIDDEN,
-                        'message' => "Monthly ad limit reached. Your plan allows {$adLimit} ad(s) per month.",
-                        'data' => [
+                    return $this->errorResponse(
+                        "Monthly ad limit reached. Your plan allows {$adLimit} ad(s) per month.",
+                        [
                             'currentAds' => $currentMonthAds,
                             'limit' => $adLimit,
                         ],
-                    ], Response::HTTP_FORBIDDEN);
+                        Response::HTTP_FORBIDDEN
+                    );
                 }
             }
 
@@ -219,22 +214,20 @@ class AdController extends Controller
 
             DB::commit();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_CREATED,
-                'message' => 'Ad created successfully.',
-                'data' => new AdResource($ad->load(['shop', 'creator'])),
-            ], Response::HTTP_CREATED);
+            return $this->successResponse(
+                'Ad created successfully.',
+                new AdResource($ad->load(['shop', 'creator'])),
+                Response::HTTP_CREATED
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to create ad.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to create ad.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -243,16 +236,17 @@ class AdController extends Controller
      */
     public function show(Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('view', $ad);
 
         $ad->load(['shop', 'creator', 'approver']);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => new AdResource($ad),
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Ad retrieved successfully.',
+            new AdResource($ad)
+        );
     }
 
     /**
@@ -260,6 +254,8 @@ class AdController extends Controller
      */
     public function update(UpdateAdRequest $request, Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('update', $ad);
 
@@ -279,22 +275,19 @@ class AdController extends Controller
 
             DB::commit();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Ad updated successfully.',
-                'data' => new AdResource($ad->fresh(['shop', 'creator', 'approver'])),
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Ad updated successfully.',
+                new AdResource($ad->fresh(['shop', 'creator', 'approver']))
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to update ad.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to update ad.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -303,25 +296,22 @@ class AdController extends Controller
      */
     public function destroy(Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('delete', $ad);
 
         try {
             $ad->delete();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Ad deleted successfully.',
-            ], Response::HTTP_OK);
+            return $this->successResponse('Ad deleted successfully.');
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to delete ad.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to delete ad.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -330,6 +320,8 @@ class AdController extends Controller
      */
     public function trackView(TrackAdViewRequest $request, Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         $user = $request->user();
         $data = $request->validated();
 
@@ -361,19 +353,14 @@ class AdController extends Controller
             // Update daily performance
             $this->updateDailyPerformance($ad, 'view', $isUnique);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'View tracked successfully.',
-            ], Response::HTTP_OK);
+            return $this->successResponse('View tracked successfully.');
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to track view.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to track view.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -382,6 +369,8 @@ class AdController extends Controller
      */
     public function trackClick(TrackAdClickRequest $request, Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         $user = $request->user();
         $data = $request->validated();
 
@@ -413,22 +402,17 @@ class AdController extends Controller
             // Update daily performance
             $this->updateDailyPerformance($ad, 'click', $isUnique);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Click tracked successfully.',
-                'data' => [
-                    'ctaUrl' => $ad->cta_url,
-                ],
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Click tracked successfully.',
+                ['ctaUrl' => $ad->cta_url]
+            );
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to track click.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to track click.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -437,6 +421,8 @@ class AdController extends Controller
      */
     public function analytics(Request $request, Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewAnalytics', $ad);
 
@@ -475,10 +461,9 @@ class AdController extends Controller
             ->groupBy('platform')
             ->get();
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Ad analytics retrieved successfully.',
+            [
                 'overview' => [
                     'totalViews' => $ad->view_count,
                     'uniqueViews' => $ad->unique_view_count,
@@ -514,7 +499,7 @@ class AdController extends Controller
                     ]),
                 ],
             ]
-        ], Response::HTTP_OK);
+        );
     }
 
     /**
@@ -522,6 +507,8 @@ class AdController extends Controller
      */
     public function approve(Request $request, Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         $user = $request->user();
 
         try {
@@ -531,20 +518,17 @@ class AdController extends Controller
                 'approved_at' => now(),
             ]);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Ad approved successfully.',
-                'data' => new AdResource($ad->fresh(['shop', 'creator', 'approver'])),
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Ad approved successfully.',
+                new AdResource($ad->fresh(['shop', 'creator', 'approver']))
+            );
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to approve ad.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to approve ad.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -553,6 +537,8 @@ class AdController extends Controller
      */
     public function reject(Request $request, Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         $request->validate([
             'reason' => 'required|string|max:500',
         ]);
@@ -567,20 +553,17 @@ class AdController extends Controller
                 'approved_at' => now(),
             ]);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Ad rejected.',
-                'data' => new AdResource($ad->fresh(['shop', 'creator', 'approver'])),
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Ad rejected.',
+                new AdResource($ad->fresh(['shop', 'creator', 'approver']))
+            );
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to reject ad.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to reject ad.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -589,25 +572,24 @@ class AdController extends Controller
      */
     public function togglePause(Ad $ad): JsonResponse
     {
+        $this->initRequestTime();
+
         try {
             $newStatus = $ad->status === AdStatus::PAUSED ? AdStatus::APPROVED : AdStatus::PAUSED;
 
             $ad->update(['status' => $newStatus]);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => $newStatus === AdStatus::PAUSED ? 'Ad paused.' : 'Ad resumed.',
-                'data' => new AdResource($ad->fresh()),
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                $newStatus === AdStatus::PAUSED ? 'Ad paused.' : 'Ad resumed.',
+                new AdResource($ad->fresh())
+            );
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to toggle ad status.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to toggle ad status.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 

@@ -5,25 +5,28 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CategoryResource;
 use App\Models\Category;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class CategoryController extends Controller
 {
+    use HasStandardResponse;
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
+        $this->initRequestTime();
+
         $categories = Category::get();
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'categories' => CategoryResource::collection($categories),
-            ]
-        ]);
+
+        return $this->successResponse(
+            'Categories retrieved successfully.',
+            ['categories' => CategoryResource::collection($categories)]
+        );
     }
 
     /**

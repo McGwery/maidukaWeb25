@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateExpenseRequest;
 use App\Http\Resources\ExpenseResource;
 use App\Models\Expense;
 use App\Models\Shop;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,11 +17,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ExpenseController extends Controller
 {
+    use HasStandardResponse;
     /**
      * Display a listing of expenses.
      */
     public function index(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewAny', [Expense::class, $shop]);
 
@@ -52,19 +56,12 @@ class ExpenseController extends Controller
             })
             ->paginate($request->perPage ?? 15);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'expenses' => ExpenseResource::collection($expenses),
-                'pagination' => [
-                    'total' => $expenses->total(),
-                    'currentPage' => $expenses->currentPage(),
-                    'lastPage' => $expenses->lastPage(),
-                    'perPage' => $expenses->perPage(),
-                ]
-            ]
-        ], Response::HTTP_OK);
+        $transformedExpenses = $expenses->setCollection(collect(ExpenseResource::collection($expenses->getCollection())));
+
+        return $this->paginatedResponse(
+            'Expenses retrieved successfully.',
+            $transformedExpenses
+        );
     }
 
     /**
@@ -72,6 +69,8 @@ class ExpenseController extends Controller
      */
     public function store(StoreExpenseRequest $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('create', [Expense::class, $shop]);
 
@@ -95,12 +94,11 @@ class ExpenseController extends Controller
 
         $expense->load(['recordedBy']);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_CREATED,
-            'message' => 'Expense recorded successfully.',
-            'data' => new ExpenseResource($expense)
-        ], Response::HTTP_CREATED);
+        return $this->successResponse(
+            'Expense recorded successfully.',
+            new ExpenseResource($expense),
+            Response::HTTP_CREATED
+        );
     }
 
     /**
@@ -108,24 +106,25 @@ class ExpenseController extends Controller
      */
     public function show(Shop $shop, Expense $expense): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('view', $expense);
 
         if ($expense->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_NOT_FOUND,
-                'message' => 'Expense not found.'
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Expense not found.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $expense->load(['recordedBy']);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => new ExpenseResource($expense)
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Expense retrieved successfully.',
+            new ExpenseResource($expense)
+        );
     }
 
     /**
@@ -133,15 +132,17 @@ class ExpenseController extends Controller
      */
     public function update(UpdateExpenseRequest $request, Shop $shop, Expense $expense): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('update', $expense);
 
         if ($expense->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_NOT_FOUND,
-                'message' => 'Expense not found.'
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Expense not found.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $data = $request->validated();
@@ -160,12 +161,10 @@ class ExpenseController extends Controller
         $expense->update($updateData);
         $expense->load(['recordedBy']);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'message' => 'Expense updated successfully.',
-            'data' => new ExpenseResource($expense)
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Expense updated successfully.',
+            new ExpenseResource($expense)
+        );
     }
 
     /**
@@ -173,24 +172,22 @@ class ExpenseController extends Controller
      */
     public function destroy(Shop $shop, Expense $expense): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('delete', $expense);
 
         if ($expense->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_NOT_FOUND,
-                'message' => 'Expense not found.'
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Expense not found.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $expense->delete();
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'message' => 'Expense deleted successfully.'
-        ], Response::HTTP_OK);
+        return $this->successResponse('Expense deleted successfully.');
     }
 
     /**
@@ -198,6 +195,8 @@ class ExpenseController extends Controller
      */
     public function summary(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewSummary', [Expense::class, $shop]);
 
@@ -296,10 +295,9 @@ class ExpenseController extends Controller
                 ];
             });
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Expense summary retrieved successfully.',
+            [
                 'totalExpenses' => $totalExpenses,
                 'categoryBreakdown' => $categoryBreakdown,
                 'paymentMethodBreakdown' => $paymentMethodBreakdown,
@@ -309,7 +307,7 @@ class ExpenseController extends Controller
                     'endDate' => $endDate,
                 ],
             ]
-        ], Response::HTTP_OK);
+        );
     }
 
     /**
@@ -317,6 +315,8 @@ class ExpenseController extends Controller
      */
     public function categories(): JsonResponse
     {
+        $this->initRequestTime();
+
         $categories = collect(ExpenseCategory::cases())->map(function ($category) {
             return [
                 'value' => $category->value,
@@ -324,13 +324,10 @@ class ExpenseController extends Controller
             ];
         });
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'categories' => $categories
-            ]
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Expense categories retrieved successfully.',
+            ['categories' => $categories]
+        );
     }
 }
 

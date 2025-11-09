@@ -18,6 +18,7 @@ use App\Models\SalePayment;
 use App\Models\SaleRefund;
 use App\Models\Shop;
 use App\Models\StockAdjustment;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,11 +27,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class POSController extends Controller
 {
+    use HasStandardResponse;
     /**
      * Complete a sale transaction
      */
     public function completeSale(CompleteSaleRequest $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('create', [Sale::class, $shop]);
 
@@ -65,25 +69,24 @@ class POSController extends Controller
             // Check if discounts are allowed
             if (($discountAmount > 0 || $discountPercentage > 0) && !$settings->allow_discounts) {
                 DB::rollBack();
-                return new JsonResponse([
-                    'success' => false,
-                    'code' => Response::HTTP_FORBIDDEN,
-                    'message' => 'Discounts are not allowed for this shop.',
-                ], Response::HTTP_FORBIDDEN);
+                return $this->errorResponse(
+                    'Discounts are not allowed for this shop.',
+                    null,
+                    Response::HTTP_FORBIDDEN
+                );
             }
 
             // Check maximum discount percentage
             if ($discountPercentage > 0 && $discountPercentage > $settings->max_discount_percentage) {
                 DB::rollBack();
-                return new JsonResponse([
-                    'success' => false,
-                    'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
-                    'message' => "Discount percentage cannot exceed {$settings->max_discount_percentage}%.",
-                    'data' => [
+                return $this->errorResponse(
+                    "Discount percentage cannot exceed {$settings->max_discount_percentage}%.",
+                    [
                         'maxDiscountPercentage' => $settings->max_discount_percentage,
                         'requestedDiscount' => $discountPercentage
-                    ]
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                    ],
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
             }
 
             if ($discountPercentage > 0) {
@@ -105,11 +108,11 @@ class POSController extends Controller
                 // Check if credit sales are allowed
                 if (!$settings->allow_credit_sales) {
                     DB::rollBack();
-                    return new JsonResponse([
-                        'success' => false,
-                        'code' => Response::HTTP_FORBIDDEN,
-                        'message' => 'Credit sales are not allowed for this shop.',
-                    ], Response::HTTP_FORBIDDEN);
+                    return $this->errorResponse(
+                        'Credit sales are not allowed for this shop.',
+                        null,
+                        Response::HTTP_FORBIDDEN
+                    );
                 }
             }
 
@@ -127,11 +130,11 @@ class POSController extends Controller
                     // Check if customer is required for credit
                     if ($debtAmount > 0 && $settings->require_customer_for_credit && empty($validated['customer']['name'])) {
                         DB::rollBack();
-                        return new JsonResponse([
-                            'success' => false,
-                            'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
-                            'message' => 'Customer information is required for credit sales.',
-                        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                        return $this->errorResponse(
+                            'Customer information is required for credit sales.',
+                            null,
+                            Response::HTTP_UNPROCESSABLE_ENTITY
+                        );
                     }
 
                     $customer = Customer::create([
@@ -147,14 +150,14 @@ class POSController extends Controller
                 if ($customer && $debtAmount > 0) {
                     if (!$customer->hasAvailableCredit($debtAmount)) {
                         DB::rollBack();
-                        return new JsonResponse([
-                            'success' => false,
-                            'message' => 'Customer does not have sufficient credit limit.',
-                            'data' => [
+                        return $this->errorResponse(
+                            'Customer does not have sufficient credit limit.',
+                            [
                                 'requiredCredit' => $debtAmount,
                                 'availableCredit' => $customer->credit_limit - $customer->current_debt,
-                            ]
-                        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                            ],
+                            Response::HTTP_UNPROCESSABLE_ENTITY
+                        );
                     }
                 }
 
@@ -191,10 +194,11 @@ class POSController extends Controller
 
                 if (!$product) {
                     DB::rollBack();
-                    return new JsonResponse([
-                        'success' => false,
-                        'message' => "Product {$itemData['name']} not found.",
-                    ], Response::HTTP_NOT_FOUND);
+                    return $this->errorResponse(
+                        "Product {$itemData['name']} not found.",
+                        null,
+                        Response::HTTP_NOT_FOUND
+                    );
                 }
 
                 // Check stock availability (skip for service products)
@@ -203,15 +207,15 @@ class POSController extends Controller
                 if ($isPhysicalProduct && $settings->track_stock && $product->track_inventory) {
                     if (!$settings->allow_negative_stock && $product->current_stock < $itemData['quantity']) {
                         DB::rollBack();
-                        return new JsonResponse([
-                            'success' => false,
-                            'message' => "Insufficient stock for {$product->product_name}. Available: {$product->current_stock}",
-                            'data' => [
+                        return $this->errorResponse(
+                            "Insufficient stock for {$product->product_name}. Available: {$product->current_stock}",
+                            [
                                 'productName' => $product->product_name,
                                 'requestedQuantity' => $itemData['quantity'],
                                 'availableStock' => $product->current_stock,
-                            ]
-                        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                            ],
+                            Response::HTTP_UNPROCESSABLE_ENTITY
+                        );
                     }
 
                     // Check low stock threshold and trigger notification if enabled
@@ -286,22 +290,20 @@ class POSController extends Controller
             // Load relationships
             $sale->load(['items', 'customer', 'payments', 'user']);
 
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Sale completed successfully',
-                'code' => Response::HTTP_CREATED,
-                'data' => [
-                    'sale' => new SaleResource($sale),
-                ]
-            ], Response::HTTP_CREATED);
+            return $this->successResponse(
+                'Sale completed successfully.',
+                ['sale' => new SaleResource($sale)],
+                Response::HTTP_CREATED
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Failed to complete sale: ' . $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to complete sale: ' . $e->getMessage(),
+                null,
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -310,6 +312,8 @@ class POSController extends Controller
      */
     public function getSales(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewAny', [Sale::class, $shop]);
 
@@ -350,19 +354,12 @@ class POSController extends Controller
 
         $sales = $query->latest('sale_date')->paginate($request->perPage ?? 15);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'sales' => SaleResource::collection($sales),
-                'pagination' => [
-                    'total' => $sales->total(),
-                    'currentPage' => $sales->currentPage(),
-                    'lastPage' => $sales->lastPage(),
-                    'perPage' => $sales->perPage(),
-                ]
-            ]
-        ]);
+        $transformedSales = $sales->setCollection(collect(SaleResource::collection($sales->getCollection())));
+
+        return $this->paginatedResponse(
+            'Sales retrieved successfully.',
+            $transformedSales
+        );
     }
 
     /**
@@ -370,25 +367,25 @@ class POSController extends Controller
      */
     public function getSale(Shop $shop, Sale $sale): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('view', $sale);
 
         if ($sale->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Sale not found in this shop.',
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Sale not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $sale->load(['items.product', 'customer', 'payments.user', 'refunds', 'user']);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'sale' => new SaleResource($sale),
-            ]
-        ]);
+        return $this->successResponse(
+            'Sale retrieved successfully.',
+            ['sale' => new SaleResource($sale)]
+        );
     }
 
     /**
@@ -396,6 +393,8 @@ class POSController extends Controller
      */
     public function getSalesAnalytics(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewAnalytics', [Sale::class, $shop]);
 
@@ -463,10 +462,9 @@ class POSController extends Controller
                 ];
             });
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Sales analytics retrieved successfully.',
+            [
                 'summary' => [
                     'totalSales' => $totalSales,
                     'totalRevenue' => round($totalRevenue, 2),
@@ -483,7 +481,7 @@ class POSController extends Controller
                     'to' => $toDate,
                 ]
             ]
-        ]);
+        );
     }
 
     /**
@@ -491,21 +489,25 @@ class POSController extends Controller
      */
     public function refundSale(Request $request, Shop $shop, Sale $sale): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('refund', $sale);
 
         if ($sale->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Sale not found in this shop.',
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Sale not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         if (!$sale->canRefund()) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'This sale cannot be refunded.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(
+                'This sale cannot be refunded.',
+                null,
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         $request->validate([
@@ -567,11 +569,9 @@ class POSController extends Controller
 
             $sale->load(['items', 'customer', 'payments', 'refunds']);
 
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Refund processed successfully',
-                'code' => Response::HTTP_OK,
-                'data' => [
+            return $this->successResponse(
+                'Refund processed successfully.',
+                [
                     'sale' => new SaleResource($sale),
                     'refund' => [
                         'id' => $refund->id,
@@ -580,15 +580,16 @@ class POSController extends Controller
                         'refundDate' => $refund->refund_date,
                     ]
                 ]
-            ]);
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Failed to process refund: ' . $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to process refund: ' . $e->getMessage(),
+                null,
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -597,23 +598,27 @@ class POSController extends Controller
      */
     public function addPayment(Request $request, Shop $shop, Sale $sale): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('addPayment', $sale);
 
         if ($sale->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Sale not found in this shop.',
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Sale not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $remainingDebt = $sale->getRemainingDebt();
 
         if ($remainingDebt <= 0) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'This sale has no outstanding debt.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(
+                'This sale has no outstanding debt.',
+                null,
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         $request->validate([
@@ -661,23 +666,22 @@ class POSController extends Controller
 
             $sale->load(['payments', 'customer']);
 
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Payment added successfully',
-                'code' => Response::HTTP_OK,
-                'data' => [
+            return $this->successResponse(
+                'Payment added successfully.',
+                [
                     'sale' => new SaleResource($sale),
                     'remainingDebt' => round($newDebtAmount, 2),
                 ]
-            ]);
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Failed to add payment: ' . $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to add payment: ' . $e->getMessage(),
+                null,
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -688,6 +692,8 @@ class POSController extends Controller
      */
     public function getCustomers(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('viewAny', [Customer::class, $shop]);
 
@@ -707,19 +713,12 @@ class POSController extends Controller
 
         $customers = $query->latest()->paginate($request->perPage ?? 15);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'customers' => CustomerResource::collection($customers),
-                'pagination' => [
-                    'total' => $customers->total(),
-                    'currentPage' => $customers->currentPage(),
-                    'lastPage' => $customers->lastPage(),
-                    'perPage' => $customers->perPage(),
-                ]
-            ]
-        ]);
+        $transformedCustomers = $customers->setCollection(collect(CustomerResource::collection($customers->getCollection())));
+
+        return $this->paginatedResponse(
+            'Customers retrieved successfully.',
+            $transformedCustomers
+        );
     }
 
     /**
@@ -727,6 +726,8 @@ class POSController extends Controller
      */
     public function createCustomer(CustomerRequest $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('create', [Customer::class, $shop]);
 
@@ -740,14 +741,11 @@ class POSController extends Controller
             'notes' => $request->notes,
         ]);
 
-        return new JsonResponse([
-            'success' => true,
-            'message' => 'Customer created successfully',
-            'code' => Response::HTTP_CREATED,
-            'data' => [
-                'customer' => new CustomerResource($customer),
-            ]
-        ], Response::HTTP_CREATED);
+        return $this->successResponse(
+            'Customer created successfully.',
+            ['customer' => new CustomerResource($customer)],
+            Response::HTTP_CREATED
+        );
     }
 
     /**
@@ -755,14 +753,17 @@ class POSController extends Controller
      */
     public function updateCustomer(CustomerRequest $request, Shop $shop, Customer $customer): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         $this->authorize('update', $customer);
 
         if ($customer->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Customer not found in this shop.',
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Customer not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $customer->update([
@@ -774,29 +775,28 @@ class POSController extends Controller
             'notes' => $request->notes,
         ]);
 
-        return new JsonResponse([
-            'success' => true,
-            'message' => 'Customer updated successfully',
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'customer' => new CustomerResource($customer),
-            ]
-        ]);
+        return $this->successResponse(
+            'Customer updated successfully.',
+            ['customer' => new CustomerResource($customer)]
+        );
     }
 
     /**
-     * Delete a customer
+     * Get a specific customer
      */
-    public function deleteCustomer(Shop $shop, Customer $customer): JsonResponse
+    public function getCustomer(Shop $shop, Customer $customer): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
-        $this->authorize('delete', $customer);
+        $this->authorize('view', $customer);
 
         if ($customer->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Customer not found in this shop.',
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Customer not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         $customer->load(['sales' => function ($query) {
@@ -806,10 +806,9 @@ class POSController extends Controller
         $totalSales = $customer->sales()->count();
         $totalDebt = $customer->current_debt;
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Customer retrieved successfully.',
+            [
                 'customer' => new CustomerResource($customer),
                 'recentSales' => SaleResource::collection($customer->sales),
                 'statistics' => [
@@ -819,41 +818,38 @@ class POSController extends Controller
                     'totalPaid' => $customer->total_paid,
                 ]
             ]
-        ]);
+        );
     }
 
     /**
-     * Get a specific customer
+     * Delete a customer
      */
-    public function getCustomer(Shop $shop, Customer $customer): JsonResponse
+    public function deleteCustomer(Shop $shop, Customer $customer): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
-        $this->authorize('view', $customer);
+        $this->authorize('delete', $customer);
 
         if ($customer->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Customer not found in this shop.',
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Customer not found in this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         if ($customer->current_debt > 0) {
-            return new JsonResponse([
-                'success' => false,
-                'message' => 'Cannot delete customer with outstanding debt.',
-                'data' => [
-                    'currentDebt' => $customer->current_debt,
-                ]
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(
+                'Cannot delete customer with outstanding debt.',
+                ['currentDebt' => $customer->current_debt],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         $customer->delete();
 
-        return new JsonResponse([
-            'success' => true,
-            'message' => 'Customer deleted successfully',
-            'code' => Response::HTTP_OK,
-        ]);
+        return $this->successResponse('Customer deleted successfully.');
     }
 }
 

@@ -8,36 +8,39 @@ use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Http\Resources\ShopResource;
 use App\Models\Category;
 use App\Models\Shop;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class ShopController extends Controller
 {
-   
+    use HasStandardResponse;
+
     /**
      * Get all shops for the authenticated user.
      */
     public function index(): JsonResponse
     {
+        $this->initRequestTime();
+
         $user = auth()->user();
 
-      
+
         $shops = $user->ownedShops()
             ->with('owner')
             ->get()
             ->union($user->memberShops()->with('owner')->get())
             ->values();
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
+        return $this->successResponse(
+            'Shops retrieved successfully.',
+            [
                 'shops' => ShopResource::collection($shops),
                 'activeShop' => $user->activeShop ? new ShopResource($user->activeShop->shop) : null,
                 'totalShops' => $shops->count(),
                 'activeShops' => $shops->where('status', 'active')->count(),
             ]
-        ]);
+        );
     }
 
     /**
@@ -45,6 +48,8 @@ class ShopController extends Controller
      */
     public function store(CreateShopRequest $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shop = Shop::create([
             ...$request->validated(),
             'owner_id' => auth()->id(),
@@ -55,14 +60,11 @@ class ShopController extends Controller
             auth()->user()->switchShop($shop);
         }
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_CREATED,
-            'message' => 'Shop created successfully',
-            'data' => [
-                'shop' => new ShopResource($shop->load('owner')),
-            ]
-        ], Response::HTTP_CREATED);
+        return $this->successResponse(
+            'Shop created successfully.',
+            ['shop' => new ShopResource($shop->load('owner'))],
+            Response::HTTP_CREATED
+        );
     }
 
     /**
@@ -70,21 +72,20 @@ class ShopController extends Controller
      */
     public function show(Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         if (!auth()->user()->canAccessShop($shop)) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'You do not have access to this shop'
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'You do not have access to this shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'shop' => new ShopResource($shop->load(['owner', 'members'])),
-            ]
-        ]);
+        return $this->successResponse(
+            'Shop retrieved successfully.',
+            ['shop' => new ShopResource($shop->load(['owner', 'members']))]
+        );
     }
 
     /**
@@ -92,61 +93,55 @@ class ShopController extends Controller
      */
     public function update(UpdateShopRequest $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         if (!auth()->user()->hasShopPermission($shop, 'manage_shop')) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'You do not have permission to update this shop',
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'You do not have permission to update this shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         $shop->update($request->validated());
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'message' => 'Shop updated successfully',
-            'data' => [
-                'shop' => new ShopResource($shop->load('owner')),
-            ]
-        ]);
+        return $this->successResponse(
+            'Shop updated successfully.',
+            ['shop' => new ShopResource($shop->load('owner'))]
+        );
     }
 
       public function destroy(Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->authorize('delete', $shop);
 
         $shop->delete();
 
-          return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_NO_CONTENT,
-            'message'=>'Shop removed successfuly',
-            'data' => null 
-        ]);
+        return $this->successResponse('Shop removed successfully.');
     }
+
     /**
      * Switch active shop.
      */
     public function switchShop(Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         try {
             auth()->user()->switchShop($shop);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Successfully switched to ' . $shop->name,
-                'data' => [
-                    'shop' => new ShopResource($shop->load('owner')),
-                ]
-            ]);
+            return $this->successResponse(
+                'Successfully switched to ' . $shop->name . '.',
+                ['shop' => new ShopResource($shop->load('owner'))]
+            );
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => $e->getMessage()
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                $e->getMessage(),
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
     }
 
@@ -155,25 +150,23 @@ class ShopController extends Controller
      */
     public function setActive(Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         if (!auth()->user()->hasShopPermission($shop, 'manage_shop')) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'You do not have permission to update this shop',
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'You do not have permission to update this shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         $shop->is_active = !$shop->is_active;
         $shop->save();
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'message' => 'Shop status updated successfully',
-            'data' => [
-                'shop' => new ShopResource($shop->load('owner')),
-            ]
-        ]);
+        return $this->successResponse(
+            'Shop status updated successfully.',
+            ['shop' => new ShopResource($shop->load('owner'))]
+        );
     }
 
 }

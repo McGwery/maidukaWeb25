@@ -8,6 +8,7 @@ use App\Http\Resources\ShopSettingsResource;
 use App\Models\Shop;
 use App\Models\ShopSettings;
 use App\Policies\ShopSettingsPolicy;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -15,11 +16,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ShopSettingsController extends Controller
 {
+    use HasStandardResponse;
+
     /**
      * Get shop settings.
      */
     public function show(Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         Gate::authorize('view', [ShopSettingsPolicy::class, $shop]);
 
@@ -33,11 +38,10 @@ class ShopSettingsController extends Controller
             ));
         }
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => new ShopSettingsResource($settings)
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Shop settings retrieved successfully.',
+            new ShopSettingsResource($settings)
+        );
     }
 
     /**
@@ -45,6 +49,8 @@ class ShopSettingsController extends Controller
      */
     public function update(UpdateShopSettingsRequest $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         Gate::authorize('update', [ShopSettingsPolicy::class, $shop]);
 
@@ -75,22 +81,19 @@ class ShopSettingsController extends Controller
 
             DB::commit();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Shop settings updated successfully.',
-                'data' => new ShopSettingsResource($settings->fresh())
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Shop settings updated successfully.',
+                new ShopSettingsResource($settings->fresh())
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to update shop settings.',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to update shop settings.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -99,6 +102,8 @@ class ShopSettingsController extends Controller
      */
     public function reset(Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         // Authorization
         Gate::authorize('reset', [ShopSettingsPolicy::class, $shop]);
 
@@ -118,22 +123,19 @@ class ShopSettingsController extends Controller
 
             DB::commit();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Shop settings reset to defaults successfully.',
-                'data' => new ShopSettingsResource($settings->fresh())
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Shop settings reset to defaults successfully.',
+                new ShopSettingsResource($settings->fresh())
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to reset shop settings.',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to reset shop settings.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -142,6 +144,8 @@ class ShopSettingsController extends Controller
      */
     public function categories(): JsonResponse
     {
+        $this->initRequestTime();
+
         $categories = [
             [
                 'key' => 'general',
@@ -199,13 +203,10 @@ class ShopSettingsController extends Controller
             ],
         ];
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'categories' => $categories
-            ]
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Settings categories retrieved successfully.',
+            ['categories' => $categories]
+        );
     }
 
     /**

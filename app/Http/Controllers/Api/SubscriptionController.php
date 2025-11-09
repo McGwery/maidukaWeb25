@@ -14,6 +14,7 @@ use App\Jobs\SendSubscriptionCreatedJob;
 use App\Jobs\SendSubscriptionRenewedJob;
 use App\Models\Shop;
 use App\Models\Subscription;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,11 +22,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SubscriptionController extends Controller
 {
+    use HasStandardResponse;
+
     /**
      * Display a listing of subscriptions for the specified shop.
      */
     public function index(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $subscriptions = $shop->subscriptions()
             ->when($request->status, function ($query, $status) {
                 $query->where('status', $status);
@@ -52,19 +57,12 @@ class SubscriptionController extends Controller
             })
             ->paginate($request->perPage ?? 15);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'subscriptions' => SubscriptionResource::collection($subscriptions),
-                'pagination' => [
-                    'total' => $subscriptions->total(),
-                    'currentPage' => $subscriptions->currentPage(),
-                    'lastPage' => $subscriptions->lastPage(),
-                    'perPage' => $subscriptions->perPage(),
-                ]
-            ]
-        ], Response::HTTP_OK);
+        $transformedSubscriptions = $subscriptions->setCollection(collect(SubscriptionResource::collection($subscriptions->getCollection())));
+
+        return $this->paginatedResponse(
+            'Subscriptions retrieved successfully.',
+            $transformedSubscriptions
+        );
     }
 
     /**
@@ -72,22 +70,22 @@ class SubscriptionController extends Controller
      */
     public function current(Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $subscription = $shop->activeSubscription;
 
         if (!$subscription) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_NOT_FOUND,
-                'message' => 'No active subscription found for this shop.',
-                'data' => null
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'No active subscription found for this shop.',
+                null,
+                Response::HTTP_NOT_FOUND
+            );
         }
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => new SubscriptionResource($subscription)
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Active subscription retrieved successfully.',
+            new SubscriptionResource($subscription)
+        );
     }
 
     /**
@@ -95,17 +93,18 @@ class SubscriptionController extends Controller
      */
     public function store(StoreSubscriptionRequest $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $data = $request->validated();
 
         // Check if shop already has an active subscription
         $activeSubscription = $shop->activeSubscription;
         if ($activeSubscription) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_CONFLICT,
-                'message' => 'Shop already has an active subscription. Please cancel or let it expire before creating a new one.',
-                'data' => new SubscriptionResource($activeSubscription)
-            ], Response::HTTP_CONFLICT);
+            return $this->errorResponse(
+                'Shop already has an active subscription. Please cancel or let it expire before creating a new one.',
+                ['activeSubscription' => new SubscriptionResource($activeSubscription)],
+                Response::HTTP_CONFLICT
+            );
         }
 
         try {
@@ -136,22 +135,20 @@ class SubscriptionController extends Controller
             // Send SMS notification to shop owner
             SendSubscriptionCreatedJob::dispatch($subscription);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_CREATED,
-                'message' => 'Subscription created successfully.',
-                'data' => new SubscriptionResource($subscription)
-            ], Response::HTTP_CREATED);
+            return $this->successResponse(
+                'Subscription created successfully.',
+                new SubscriptionResource($subscription),
+                Response::HTTP_CREATED
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to create subscription.',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to create subscription.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -160,21 +157,21 @@ class SubscriptionController extends Controller
      */
     public function show(Shop $shop, Subscription $subscription): JsonResponse
     {
+        $this->initRequestTime();
+
         // Ensure subscription belongs to the shop
         if ($subscription->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'This subscription does not belong to the specified shop.',
-                'data' => null
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'This subscription does not belong to the specified shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => new SubscriptionResource($subscription)
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Subscription retrieved successfully.',
+            new SubscriptionResource($subscription)
+        );
     }
 
     /**
@@ -182,14 +179,15 @@ class SubscriptionController extends Controller
      */
     public function update(UpdateSubscriptionRequest $request, Shop $shop, Subscription $subscription): JsonResponse
     {
+        $this->initRequestTime();
+
         // Ensure subscription belongs to the shop
         if ($subscription->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'This subscription does not belong to the specified shop.',
-                'data' => null
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'This subscription does not belong to the specified shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         $data = $request->validated();
@@ -236,22 +234,19 @@ class SubscriptionController extends Controller
 
             DB::commit();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Subscription updated successfully.',
-                'data' => new SubscriptionResource($subscription->fresh())
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Subscription updated successfully.',
+                new SubscriptionResource($subscription->fresh())
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to update subscription.',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to update subscription.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -260,23 +255,23 @@ class SubscriptionController extends Controller
      */
     public function cancel(CancelSubscriptionRequest $request, Shop $shop, Subscription $subscription): JsonResponse
     {
+        $this->initRequestTime();
+
         // Ensure subscription belongs to the shop
         if ($subscription->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'This subscription does not belong to the specified shop.',
-                'data' => null
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'This subscription does not belong to the specified shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         if ($subscription->status === SubscriptionStatus::CANCELLED) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_CONFLICT,
-                'message' => 'This subscription is already cancelled.',
-                'data' => new SubscriptionResource($subscription)
-            ], Response::HTTP_CONFLICT);
+            return $this->errorResponse(
+                'This subscription is already cancelled.',
+                ['subscription' => new SubscriptionResource($subscription)],
+                Response::HTTP_CONFLICT
+            );
         }
 
         $data = $request->validated();
@@ -284,20 +279,17 @@ class SubscriptionController extends Controller
         try {
             $subscription->cancel($data['reason'] ?? null);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Subscription cancelled successfully.',
-                'data' => new SubscriptionResource($subscription->fresh())
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Subscription cancelled successfully.',
+                new SubscriptionResource($subscription->fresh())
+            );
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to cancel subscription.',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to cancel subscription.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -306,14 +298,15 @@ class SubscriptionController extends Controller
      */
     public function renew(RenewSubscriptionRequest $request, Shop $shop, Subscription $subscription): JsonResponse
     {
+        $this->initRequestTime();
+
         // Ensure subscription belongs to the shop
         if ($subscription->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'This subscription does not belong to the specified shop.',
-                'data' => null
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'This subscription does not belong to the specified shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         $data = $request->validated();
@@ -337,22 +330,19 @@ class SubscriptionController extends Controller
             // Send SMS notification to shop owner
             SendSubscriptionRenewedJob::dispatch($subscription->fresh());
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Subscription renewed successfully.',
-                'data' => new SubscriptionResource($subscription->fresh())
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Subscription renewed successfully.',
+                new SubscriptionResource($subscription->fresh())
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to renew subscription.',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to renew subscription.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -361,42 +351,39 @@ class SubscriptionController extends Controller
      */
     public function suspend(Shop $shop, Subscription $subscription): JsonResponse
     {
+        $this->initRequestTime();
+
         // Ensure subscription belongs to the shop
         if ($subscription->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'This subscription does not belong to the specified shop.',
-                'data' => null
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'This subscription does not belong to the specified shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         if ($subscription->status === SubscriptionStatus::SUSPENDED) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_CONFLICT,
-                'message' => 'This subscription is already suspended.',
-                'data' => new SubscriptionResource($subscription)
-            ], Response::HTTP_CONFLICT);
+            return $this->errorResponse(
+                'This subscription is already suspended.',
+                ['subscription' => new SubscriptionResource($subscription)],
+                Response::HTTP_CONFLICT
+            );
         }
 
         try {
             $subscription->suspend();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Subscription suspended successfully.',
-                'data' => new SubscriptionResource($subscription->fresh())
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Subscription suspended successfully.',
+                new SubscriptionResource($subscription->fresh())
+            );
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to suspend subscription.',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to suspend subscription.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -405,42 +392,39 @@ class SubscriptionController extends Controller
      */
     public function activate(Shop $shop, Subscription $subscription): JsonResponse
     {
+        $this->initRequestTime();
+
         // Ensure subscription belongs to the shop
         if ($subscription->shop_id !== $shop->id) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_FORBIDDEN,
-                'message' => 'This subscription does not belong to the specified shop.',
-                'data' => null
-            ], Response::HTTP_FORBIDDEN);
+            return $this->errorResponse(
+                'This subscription does not belong to the specified shop.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         if ($subscription->status === SubscriptionStatus::ACTIVE) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_CONFLICT,
-                'message' => 'This subscription is already active.',
-                'data' => new SubscriptionResource($subscription)
-            ], Response::HTTP_CONFLICT);
+            return $this->errorResponse(
+                'This subscription is already active.',
+                ['subscription' => new SubscriptionResource($subscription)],
+                Response::HTTP_CONFLICT
+            );
         }
 
         try {
             $subscription->activate();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Subscription activated successfully.',
-                'data' => new SubscriptionResource($subscription->fresh())
-            ], Response::HTTP_OK);
+            return $this->successResponse(
+                'Subscription activated successfully.',
+                new SubscriptionResource($subscription->fresh())
+            );
 
         } catch (\Exception $e) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to activate subscription.',
-                'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to activate subscription.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -449,6 +433,8 @@ class SubscriptionController extends Controller
      */
     public function plans(): JsonResponse
     {
+        $this->initRequestTime();
+
         $plans = collect(SubscriptionPlan::cases())->map(function ($plan) {
             return [
                 'value' => $plan->value,
@@ -459,13 +445,10 @@ class SubscriptionController extends Controller
             ];
         });
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'plans' => $plans
-            ]
-        ], Response::HTTP_OK);
+        return $this->successResponse(
+            'Subscription plans retrieved successfully.',
+            ['plans' => $plans]
+        );
     }
 
     /**

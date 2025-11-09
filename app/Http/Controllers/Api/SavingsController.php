@@ -16,25 +16,32 @@ use App\Models\SavingsGoal;
 use App\Models\SavingsTransaction;
 use App\Models\ShopSavingsSetting;
 use App\Policies\SavingsPolicy;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\Response;
 
 class SavingsController extends Controller
 {
+    use HasStandardResponse;
+
     /**
      * Get or create savings settings for shop
      */
     public function getSettings(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -51,10 +58,10 @@ class SavingsController extends Controller
             ]
         );
 
-        return response()->json([
-            'success' => true,
-            'data' => new ShopSavingsSettingResource($settings),
-        ]);
+        return $this->successResponse(
+            'Savings settings retrieved successfully.',
+            new ShopSavingsSettingResource($settings)
+        );
     }
 
     /**
@@ -62,13 +69,16 @@ class SavingsController extends Controller
      */
     public function updateSettings(UpdateSavingsSettingsRequest $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -91,16 +101,15 @@ class SavingsController extends Controller
             'minimum_withdrawal_amount' => $validated['minimumWithdrawalAmount'] ?? $settings->minimum_withdrawal_amount,
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Savings settings updated successfully',
-            'data' => [
+        return $this->successResponse(
+            'Savings settings updated successfully.',
+            [
                 'id' => $settings->id,
                 'isEnabled' => $settings->is_enabled,
                 'savingsType' => $settings->savings_type,
                 'currentBalance' => (float) $settings->current_balance,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -108,13 +117,16 @@ class SavingsController extends Controller
      */
     public function deposit(SavingsDepositRequest $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -162,14 +174,13 @@ class SavingsController extends Controller
 
         $settings->refresh();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Deposit successful',
-            'data' => [
+        return $this->successResponse(
+            'Deposit successful.',
+            [
                 'currentBalance' => (float) $settings->current_balance,
                 'totalSaved' => (float) $settings->total_saved,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -177,13 +188,16 @@ class SavingsController extends Controller
      */
     public function withdraw(SavingsWithdrawalRequest $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         $validated = $request->validated();
@@ -192,10 +206,11 @@ class SavingsController extends Controller
 
         // Check if withdrawal is possible
         if ($settings->current_balance < $validated['amount']) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Insufficient savings balance',
-            ], 400);
+            return $this->errorResponse(
+                'Insufficient savings balance.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         DB::transaction(function () use ($settings, $validated, $request) {
@@ -227,14 +242,13 @@ class SavingsController extends Controller
 
         $settings->refresh();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Withdrawal successful',
-            'data' => [
+        return $this->successResponse(
+            'Withdrawal successful.',
+            [
                 'currentBalance' => (float) $settings->current_balance,
                 'totalWithdrawn' => (float) $settings->total_withdrawn,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -242,13 +256,16 @@ class SavingsController extends Controller
      */
     public function getTransactions(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -270,10 +287,10 @@ class SavingsController extends Controller
             ->limit($limit)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => SavingsTransactionResource::collection($transactions),
-        ]);
+        return $this->successResponse(
+            'Savings transactions retrieved successfully.',
+            SavingsTransactionResource::collection($transactions)
+        );
     }
 
     /**
@@ -281,13 +298,16 @@ class SavingsController extends Controller
      */
     public function getSummary(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         $settings = ShopSavingsSetting::firstOrCreate(['shop_id' => $shopId]);
@@ -336,9 +356,9 @@ class SavingsController extends Controller
             })
             ->values();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return $this->successResponse(
+            'Savings summary retrieved successfully.',
+            [
                 'currentBalance' => (float) $settings->current_balance,
                 'totalSaved' => (float) $totalDeposits,
                 'totalWithdrawn' => (float) $totalWithdrawals,
@@ -350,8 +370,8 @@ class SavingsController extends Controller
                 'savingsType' => $settings->savings_type,
                 'withdrawalFrequency' => $settings->withdrawal_frequency,
                 'monthlyBreakdown' => $monthlyData,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -359,13 +379,16 @@ class SavingsController extends Controller
      */
     public function createGoal(CreateSavingsGoalRequest $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -386,11 +409,11 @@ class SavingsController extends Controller
             'status' => 'active',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Savings goal created successfully',
-            'data' => new SavingsGoalResource($goal),
-        ], 201);
+        return $this->successResponse(
+            'Savings goal created successfully.',
+            new SavingsGoalResource($goal),
+            Response::HTTP_CREATED
+        );
     }
 
     /**
@@ -398,13 +421,16 @@ class SavingsController extends Controller
      */
     public function getGoals(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -424,10 +450,10 @@ class SavingsController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => SavingsGoalResource::collection($goals),
-        ]);
+        return $this->successResponse(
+            'Savings goals retrieved successfully.',
+            SavingsGoalResource::collection($goals)
+        );
     }
 
     /**
@@ -435,13 +461,16 @@ class SavingsController extends Controller
      */
     public function updateGoal(UpdateSavingsGoalRequest $request, SavingsGoal $goal): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId || $goal->shop_id !== $shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized',
-            ], 403);
+            return $this->errorResponse(
+                'Unauthorized.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         $validated = $request->validated();
@@ -457,11 +486,10 @@ class SavingsController extends Controller
             'priority' => $validated['priority'] ?? $goal->priority,
         ]));
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Savings goal updated successfully',
-            'data' => new SavingsGoalResource($goal),
-        ]);
+        return $this->successResponse(
+            'Savings goal updated successfully.',
+            new SavingsGoalResource($goal)
+        );
     }
 
     /**
@@ -469,21 +497,21 @@ class SavingsController extends Controller
      */
     public function deleteGoal(Request $request, SavingsGoal $goal): JsonResponse
     {
+        $this->initRequestTime();
+
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId || $goal->shop_id !== $shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized',
-            ], 403);
+            return $this->errorResponse(
+                'Unauthorized.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         $goal->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Savings goal deleted successfully',
-        ]);
+        return $this->successResponse('Savings goal deleted successfully.');
     }
 }
 

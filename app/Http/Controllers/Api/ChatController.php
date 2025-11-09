@@ -19,17 +19,23 @@ use App\Models\Message;
 use App\Models\MessageReaction;
 use App\Models\Shop;
 use App\Models\TypingIndicator;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 
 class ChatController extends Controller
 {
+    use HasStandardResponse;
+
     /**
      * Get all conversations for a shop
      */
     public function getConversations(Request $request, string $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $request->validate([
             'archived' => 'nullable|boolean',
             'search' => 'nullable|string|max:255',
@@ -73,19 +79,12 @@ class ChatController extends Controller
 
         $conversations = $query->paginate($perPage);
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'data' => [
-                'conversations' => ConversationResource::collection($conversations->items()),
-                'pagination' => [
-                    'total' => $conversations->total(),
-                    'currentPage' => $conversations->currentPage(),
-                    'lastPage' => $conversations->lastPage(),
-                    'perPage' => $conversations->perPage(),
-                ],
-            ],
-        ]);
+        $transformedConversations = $conversations->setCollection(collect(ConversationResource::collection($conversations->getCollection())));
+
+        return $this->paginatedResponse(
+            'Conversations retrieved successfully.',
+            $transformedConversations
+        );
     }
 
     /**
@@ -93,15 +92,16 @@ class ChatController extends Controller
      */
     public function getConversation(string $shop, string $conversation): JsonResponse
     {
+        $this->initRequestTime();
+
         $conv = Conversation::with(['shopOne', 'shopTwo', 'lastMessageUser'])
             ->forShop($shop)
             ->findOrFail($conversation);
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'data' => new ConversationResource($conv),
-        ]);
+        return $this->successResponse(
+            'Conversation retrieved successfully.',
+            new ConversationResource($conv)
+        );
     }
 
     /**
@@ -139,20 +139,13 @@ class ChatController extends Controller
                 'read_at' => now(),
             ]);
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'data' => [
-                'messages' => MessageResource::collection($messages->items()),
-                'pagination' => [
-                    'total' => $messages->total(),
-                    'currentPage' => $messages->currentPage(),
-                    'lastPage' => $messages->lastPage(),
-                    'perPage' => $messages->perPage(),
-                    'hasMore' => $messages->hasMorePages(),
-                ],
-            ],
-        ]);
+        $transformedMessages = $messages->setCollection(collect(MessageResource::collection($messages->getCollection())));
+
+        return $this->paginatedResponse(
+            'Messages retrieved successfully.',
+            $transformedMessages,
+            ['hasMore' => $messages->hasMorePages()]
+        );
     }
 
     /**
@@ -160,15 +153,17 @@ class ChatController extends Controller
      */
     public function sendMessage(SendMessageRequest $request, string $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $receiverShopId = $request->input('receiverShopId');
 
         // Check if blocked
         if (BlockedShop::isBlocked($shop, $receiverShopId) || BlockedShop::isBlocked($receiverShopId, $shop)) {
-            return response()->json([
-                'success' => false,
-                'code' => 403,
-                'message' => 'Cannot send message. One of the shops has blocked the other.',
-            ], 403);
+            return $this->errorResponse(
+                'Cannot send message. One of the shops has blocked the other.',
+                null,
+                Response::HTTP_FORBIDDEN
+            );
         }
 
         // Validate receiver shop exists
@@ -205,20 +200,18 @@ class ChatController extends Controller
 
             $message->load(['senderShop', 'senderUser', 'receiverShop', 'product', 'replyTo.senderUser', 'reactions']);
 
-            return response()->json([
-                'success' => true,
-                'code' => 201,
-                'message' => 'Message sent successfully.',
-                'data' => new MessageResource($message),
-            ], 201);
+            return $this->successResponse(
+                'Message sent successfully.',
+                new MessageResource($message),
+                Response::HTTP_CREATED
+            );
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'code' => 500,
-                'message' => 'Failed to send message.',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->errorResponse(
+                'Failed to send message.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -227,6 +220,8 @@ class ChatController extends Controller
      */
     public function deleteMessage(string $shop, string $conversation, string $message): JsonResponse
     {
+        $this->initRequestTime();
+
         $msg = Message::where('conversation_id', $conversation)
             ->forShop($shop)
             ->findOrFail($message);
@@ -236,11 +231,7 @@ class ChatController extends Controller
         // Broadcast message deleted event
         broadcast(new MessageDeleted($msg->id, $conversation, $shop))->toOthers();
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => 'Message deleted successfully.',
-        ]);
+        return $this->successResponse('Message deleted successfully.');
     }
 
     /**
@@ -248,6 +239,8 @@ class ChatController extends Controller
      */
     public function markAsRead(Request $request, string $shop, string $conversation): JsonResponse
     {
+        $this->initRequestTime();
+
         $request->validate([
             'messageIds' => 'nullable|array',
             'messageIds.*' => 'uuid|exists:messages,id',
@@ -276,14 +269,10 @@ class ChatController extends Controller
             }
         }
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => 'Messages marked as read.',
-            'data' => [
-                'markedCount' => $updated,
-            ],
-        ]);
+        return $this->successResponse(
+            'Messages marked as read.',
+            ['markedCount' => $updated]
+        );
     }
 
     /**
@@ -291,6 +280,8 @@ class ChatController extends Controller
      */
     public function getUnreadCount(string $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $count = Message::where('receiver_shop_id', $shop)
             ->where('is_read', false)
             ->count();
@@ -302,14 +293,13 @@ class ChatController extends Controller
             ->get()
             ->mapWithKeys(fn($item) => [$item->conversation_id => $item->count]);
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'data' => [
+        return $this->successResponse(
+            'Unread messages count retrieved successfully.',
+            [
                 'totalUnread' => $count,
                 'byConversation' => $conversationCounts,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -317,19 +307,17 @@ class ChatController extends Controller
      */
     public function toggleArchive(string $shop, string $conversation): JsonResponse
     {
+        $this->initRequestTime();
+
         $conv = Conversation::forShop($shop)->findOrFail($conversation);
 
         $isArchived = $conv->isArchived($shop);
         $conv->markAsArchived($shop, !$isArchived);
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => $isArchived ? 'Conversation unarchived.' : 'Conversation archived.',
-            'data' => [
-                'isArchived' => !$isArchived,
-            ],
-        ]);
+        return $this->successResponse(
+            $isArchived ? 'Conversation unarchived.' : 'Conversation archived.',
+            ['isArchived' => !$isArchived]
+        );
     }
 
     /**
@@ -337,6 +325,8 @@ class ChatController extends Controller
      */
     public function startTyping(string $shop, string $conversation): JsonResponse
     {
+        $this->initRequestTime();
+
         $conv = Conversation::forShop($shop)->findOrFail($conversation);
 
         TypingIndicator::updateOrCreate(
@@ -363,11 +353,7 @@ class ChatController extends Controller
             true
         ))->toOthers();
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => 'Typing indicator updated.',
-        ]);
+        return $this->successResponse('Typing indicator updated.');
     }
 
     /**
@@ -375,6 +361,8 @@ class ChatController extends Controller
      */
     public function stopTyping(string $shop, string $conversation): JsonResponse
     {
+        $this->initRequestTime();
+
         TypingIndicator::where('conversation_id', $conversation)
             ->where('shop_id', $shop)
             ->where('user_id', auth()->id())
@@ -392,11 +380,7 @@ class ChatController extends Controller
             false
         ))->toOthers();
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => 'Typing stopped.',
-        ]);
+        return $this->successResponse('Typing stopped.');
     }
 
     /**
@@ -404,6 +388,8 @@ class ChatController extends Controller
      */
     public function getTypingStatus(string $shop, string $conversation): JsonResponse
     {
+        $this->initRequestTime();
+
         $conv = Conversation::forShop($shop)->findOrFail($conversation);
 
         $otherShopId = $conv->getOtherShop($shop)?->id;
@@ -422,14 +408,13 @@ class ChatController extends Controller
                 ];
             });
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'data' => [
+        return $this->successResponse(
+            'Typing status retrieved successfully.',
+            [
                 'isTyping' => $typing->isNotEmpty(),
                 'typing' => $typing,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -437,6 +422,8 @@ class ChatController extends Controller
      */
     public function reactToMessage(Request $request, string $shop, string $conversation, string $message): JsonResponse
     {
+        $this->initRequestTime();
+
         $request->validate([
             'reaction' => 'required|string|max:10',
         ]);
@@ -465,15 +452,13 @@ class ChatController extends Controller
             $reaction->reaction
         ))->toOthers();
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => 'Reaction added.',
-            'data' => [
+        return $this->successResponse(
+            'Reaction added.',
+            [
                 'id' => $reaction->id,
                 'reaction' => $reaction->reaction,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -481,6 +466,8 @@ class ChatController extends Controller
      */
     public function removeReaction(string $shop, string $conversation, string $message): JsonResponse
     {
+        $this->initRequestTime();
+
         $msg = Message::where('conversation_id', $conversation)
             ->forShop($shop)
             ->findOrFail($message);
@@ -496,11 +483,7 @@ class ChatController extends Controller
             auth()->id()
         ))->toOthers();
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => 'Reaction removed.',
-        ]);
+        return $this->successResponse('Reaction removed.');
     }
 
     /**
@@ -508,6 +491,8 @@ class ChatController extends Controller
      */
     public function blockShop(Request $request, string $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $request->validate([
             'blockedShopId' => 'required|uuid|exists:shops,id',
             'reason' => 'nullable|string|max:500',
@@ -516,11 +501,11 @@ class ChatController extends Controller
         $blockedShopId = $request->input('blockedShopId');
 
         if ($shop === $blockedShopId) {
-            return response()->json([
-                'success' => false,
-                'code' => 400,
-                'message' => 'Cannot block your own shop.',
-            ], 400);
+            return $this->errorResponse(
+                'Cannot block your own shop.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         $blocked = BlockedShop::firstOrCreate(
@@ -534,14 +519,11 @@ class ChatController extends Controller
             ]
         );
 
-        return response()->json([
-            'success' => true,
-            'code' => 201,
-            'message' => 'Shop blocked successfully.',
-            'data' => [
-                'id' => $blocked->id,
-            ],
-        ]);
+        return $this->successResponse(
+            'Shop blocked successfully.',
+            ['id' => $blocked->id],
+            Response::HTTP_CREATED
+        );
     }
 
     /**
@@ -549,6 +531,8 @@ class ChatController extends Controller
      */
     public function unblockShop(Request $request, string $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $request->validate([
             'blockedShopId' => 'required|uuid|exists:shops,id',
         ]);
@@ -557,11 +541,7 @@ class ChatController extends Controller
             ->where('blocked_shop_id', $request->input('blockedShopId'))
             ->delete();
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => 'Shop unblocked successfully.',
-        ]);
+        return $this->successResponse('Shop unblocked successfully.');
     }
 
     /**
@@ -569,6 +549,8 @@ class ChatController extends Controller
      */
     public function getBlockedShops(string $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $blocked = BlockedShop::where('shop_id', $shop)
             ->with(['blockedShop', 'blockedByUser'])
             ->latest()
@@ -591,14 +573,13 @@ class ChatController extends Controller
                 ];
             });
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'data' => [
+        return $this->successResponse(
+            'Blocked shops retrieved successfully.',
+            [
                 'blockedShops' => $blocked,
                 'total' => $blocked->count(),
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -606,6 +587,8 @@ class ChatController extends Controller
      */
     public function searchShops(Request $request, string $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $request->validate([
             'search' => 'required|string|min:2|max:255',
             'perPage' => 'nullable|integer|min:1|max:50',
@@ -628,19 +611,10 @@ class ChatController extends Controller
             ->select('id', 'name', 'shop_type', 'logo_url', 'location')
             ->paginate($perPage);
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'data' => [
-                'shops' => $shops->items(),
-                'pagination' => [
-                    'total' => $shops->total(),
-                    'currentPage' => $shops->currentPage(),
-                    'lastPage' => $shops->lastPage(),
-                    'perPage' => $shops->perPage(),
-                ],
-            ],
-        ]);
+        return $this->paginatedResponse(
+            'Shops retrieved successfully.',
+            $shops
+        );
     }
 
     /**
@@ -648,6 +622,8 @@ class ChatController extends Controller
      */
     public function getStatistics(string $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $totalConversations = Conversation::forShop($shop)->active()->count();
         $archivedConversations = Conversation::forShop($shop)
             ->where(function ($q) use ($shop) {
@@ -668,10 +644,9 @@ class ChatController extends Controller
         $totalMessagesSent = Message::where('sender_shop_id', $shop)->count();
         $totalMessagesReceived = Message::where('receiver_shop_id', $shop)->count();
 
-        return response()->json([
-            'success' => true,
-            'code' => 200,
-            'data' => [
+        return $this->successResponse(
+            'Chat statistics retrieved successfully.',
+            [
                 'totalConversations' => $totalConversations,
                 'archivedConversations' => $archivedConversations,
                 'activeConversations' => $totalConversations - $archivedConversations,
@@ -679,8 +654,8 @@ class ChatController extends Controller
                 'totalMessagesSent' => $totalMessagesSent,
                 'totalMessagesReceived' => $totalMessagesReceived,
                 'totalMessages' => $totalMessagesSent + $totalMessagesReceived,
-            ],
-        ]);
+            ]
+        );
     }
 }
 

@@ -12,29 +12,34 @@ use App\Models\Shop;
 use App\Models\ShopMember;
 use App\Policies\ReportPolicy;
 use App\Traits\HasDateRangeFilter;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\Response;
 
 class ReportsController extends Controller
 {
-    use HasDateRangeFilter;
+    use HasDateRangeFilter, HasStandardResponse;
 
     /**
      * Get sales report
      */
     public function salesReport(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->validateDateFilter($request);
         $dateRange = $this->getDateRange($request);
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -111,9 +116,9 @@ class ReportsController extends Controller
                 'totalProfit' => (float) $item->profit,
             ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return $this->successResponse(
+            'Sales report generated successfully.',
+            [
                 'period' => [
                     'filter' => $request->input('dateFilter', 'today'),
                     'startDate' => $dateRange['startDate']->toDateString(),
@@ -131,8 +136,8 @@ class ReportsController extends Controller
                 'salesByPaymentStatus' => $salesByPaymentStatus,
                 'topCustomers' => $topCustomers,
                 'dailyBreakdown' => $dailySales,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -140,15 +145,18 @@ class ReportsController extends Controller
      */
     public function productsReport(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->validateDateFilter($request);
         $dateRange = $this->getDateRange($request);
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -234,9 +242,9 @@ class ReportsController extends Controller
                 'totalStock' => (int) $item->totalStock,
             ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return $this->successResponse(
+            'Products report generated successfully.',
+            [
                 'period' => [
                     'filter' => $request->input('dateFilter', 'today'),
                     'startDate' => $dateRange['startDate']->toDateString(),
@@ -254,8 +262,8 @@ class ReportsController extends Controller
                 'topSellingByRevenue' => $topSellingByRevenue,
                 'lowStockAlert' => $lowStockAlert,
                 'categoryBreakdown' => $categoryBreakdown,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -263,15 +271,18 @@ class ReportsController extends Controller
      */
     public function financialReport(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->validateDateFilter($request);
         $dateRange = $this->getDateRange($request);
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -411,9 +422,9 @@ class ReportsController extends Controller
         $totalRevenue = (float) ($salesMetrics->totalRevenue ?? 0);
         $profitMargin = $totalRevenue > 0 ? ($grossProfit / $totalRevenue) * 100 : 0;
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return $this->successResponse(
+            'Financial report generated successfully.',
+            [
                 'period' => [
                     'filter' => $request->input('dateFilter', 'today'),
                     'startDate' => $dateRange['startDate']->toDateString(),
@@ -445,8 +456,8 @@ class ReportsController extends Controller
                     'netCashFlow' => $cashFlow,
                 ],
                 'dailyBreakdown' => $dailyFinancials,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -454,15 +465,18 @@ class ReportsController extends Controller
      */
     public function employeesReport(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->validateDateFilter($request);
         $dateRange = $this->getDateRange($request);
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
@@ -538,9 +552,9 @@ class ReportsController extends Controller
             })
             ->values();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return $this->successResponse(
+            'Employees report generated successfully.',
+            [
                 'period' => [
                     'filter' => $request->input('dateFilter', 'today'),
                     'startDate' => $dateRange['startDate']->toDateString(),
@@ -555,8 +569,8 @@ class ReportsController extends Controller
                 'topPerformers' => $topPerformers,
                 'teamMembers' => $teamMembers,
                 'dailyPerformance' => $dailyPerformance,
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
@@ -564,30 +578,23 @@ class ReportsController extends Controller
      */
     public function overviewReport(Request $request): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->validateDateFilter($request);
         $dateRange = $this->getDateRange($request);
         $shopId = $request->user()->activeShop->shop_id ?? null;
 
         if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
+            return $this->errorResponse(
+                'No active shop selected.',
+                null,
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Authorization
         $shop = Shop::findOrFail($shopId);
         Gate::authorize('viewOverviewReport', [ReportPolicy::class, $shop]);
-        $this->validateDateFilter($request);
-        $dateRange = $this->getDateRange($request);
-        $shopId = $request->user()->activeShop->shop_id ?? null;
-
-        if (!$shopId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active shop selected',
-            ], 400);
-        }
 
         // Sales summary
         $salesSummary = Sale::where('shop_id', $shopId)
@@ -631,9 +638,9 @@ class ReportsController extends Controller
             'customersWithDebt' => Customer::where('shop_id', $shopId)->where('current_debt', '>', 0)->count(),
         ];
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return $this->successResponse(
+            'Overview report generated successfully.',
+            [
                 'period' => [
                     'filter' => $request->input('dateFilter', 'today'),
                     'startDate' => $dateRange['startDate']->toDateString(),
@@ -648,7 +655,7 @@ class ReportsController extends Controller
                 'financial' => $financialSummary,
                 'employees' => $employeesSummary,
                 'customers' => $customersSummary,
-            ],
-        ]);
+            ]
+        );
     }
 }

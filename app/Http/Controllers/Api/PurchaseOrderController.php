@@ -18,6 +18,7 @@ use App\Models\PurchaseOrderItem;
 use App\Models\PurchasePayment;
 use App\Models\Shop;
 use App\Models\StockTransfer;
+use App\Traits\HasStandardResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -26,11 +27,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PurchaseOrderController extends Controller
 {
+    use HasStandardResponse;
+
     /**
      * Display a listing of purchase orders for the buyer shop.
      */
     public function indexAsBuyer(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->authorize('viewAny', [PurchaseOrder::class, $shop]);
 
         $orders = PurchaseOrder::where('buyer_shop_id', $shop->id)
@@ -53,19 +58,12 @@ class PurchaseOrderController extends Controller
             ->latest()
             ->paginate($request->per_page ?? 15);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'orders' => PurchaseOrderResource::collection($orders),
-                'pagination' => [
-                    'total' => $orders->total(),
-                    'current_page' => $orders->currentPage(),
-                    'last_page' => $orders->lastPage(),
-                    'per_page' => $orders->perPage(),
-                ]
-            ]
-        ]);
+        $transformedOrders = $orders->setCollection(collect(PurchaseOrderResource::collection($orders->getCollection())));
+
+        return $this->paginatedResponse(
+            'Purchase orders retrieved successfully.',
+            $transformedOrders
+        );
     }
 
     /**
@@ -73,6 +71,8 @@ class PurchaseOrderController extends Controller
      */
     public function indexAsSeller(Request $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->authorize('viewAny', [PurchaseOrder::class, $shop]);
 
         $orders = PurchaseOrder::where('seller_shop_id', $shop->id)
@@ -95,19 +95,12 @@ class PurchaseOrderController extends Controller
             ->latest()
             ->paginate($request->per_page ?? 15);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'orders' => PurchaseOrderResource::collection($orders),
-                'pagination' => [
-                    'total' => $orders->total(),
-                    'current_page' => $orders->currentPage(),
-                    'last_page' => $orders->lastPage(),
-                    'per_page' => $orders->perPage(),
-                ]
-            ]
-        ]);
+        $transformedOrders = $orders->setCollection(collect(PurchaseOrderResource::collection($orders->getCollection())));
+
+        return $this->paginatedResponse(
+            'Purchase orders retrieved successfully.',
+            $transformedOrders
+        );
     }
 
     /**
@@ -115,6 +108,8 @@ class PurchaseOrderController extends Controller
      */
     public function store(CreatePurchaseOrderRequest $request, Shop $shop): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->authorize('create', [PurchaseOrder::class, $shop]);
 
         // Verify seller shop exists and is active
@@ -123,11 +118,11 @@ class PurchaseOrderController extends Controller
             ->first();
 
         if (!$sellerShop) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
-                'message' => 'Seller shop not found or inactive.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(
+                'Seller shop not found or inactive.',
+                null,
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         DB::beginTransaction();
@@ -155,24 +150,20 @@ class PurchaseOrderController extends Controller
 
             $purchaseOrder->load(['sellerShop', 'items.product']);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_CREATED,
-                'message' => 'Purchase order created successfully',
-                'data' => [
-                    'purchaseOrder' => new PurchaseOrderResource($purchaseOrder),
-                ],
-            ], Response::HTTP_CREATED);
+            return $this->successResponse(
+                'Purchase order created successfully.',
+                ['purchaseOrder' => new PurchaseOrderResource($purchaseOrder)],
+                Response::HTTP_CREATED
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to create purchase order',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to create purchase order.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -181,17 +172,16 @@ class PurchaseOrderController extends Controller
      */
     public function show(Request $request, Shop $shop, PurchaseOrder $purchaseOrder): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->authorize('view', [$purchaseOrder, $shop]);
 
         $purchaseOrder->load(['buyerShop', 'sellerShop', 'items.product', 'payments', 'stockTransfers']);
 
-        return new JsonResponse([
-            'success' => true,
-            'code' => Response::HTTP_OK,
-            'data' => [
-                'purchaseOrder' => new PurchaseOrderResource($purchaseOrder),
-            ],
-        ]);
+        return $this->successResponse(
+            'Purchase order retrieved successfully.',
+            ['purchaseOrder' => new PurchaseOrderResource($purchaseOrder)]
+        );
     }
 
     /**
@@ -199,6 +189,8 @@ class PurchaseOrderController extends Controller
      */
     public function update(UpdatePurchaseOrderRequest $request, Shop $shop, PurchaseOrder $purchaseOrder): JsonResponse
     {
+        $this->initRequestTime();
+
         $this->authorize('update', [$purchaseOrder, $shop]);
 
         DB::beginTransaction();
@@ -229,24 +221,19 @@ class PurchaseOrderController extends Controller
 
             $purchaseOrder->load(['sellerShop', 'items.product']);
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Purchase order updated successfully',
-                'data' => [
-                    'purchaseOrder' => new PurchaseOrderResource($purchaseOrder),
-                ],
-            ]);
+            return $this->successResponse(
+                'Purchase order updated successfully.',
+                ['purchaseOrder' => new PurchaseOrderResource($purchaseOrder)]
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to update purchase order',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to update purchase order.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -258,30 +245,32 @@ class PurchaseOrderController extends Controller
         Shop $shop,
         PurchaseOrder $purchaseOrder
     ): JsonResponse {
+        $this->initRequestTime();
+
         $this->authorize('approve', [$purchaseOrder, $shop]);
 
         if ($request->status === PurchaseOrderStatus::APPROVED && !$purchaseOrder->canBeApproved()) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
-                'message' => 'Purchase order cannot be approved.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(
+                'Purchase order cannot be approved.',
+                null,
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         if ($request->status === PurchaseOrderStatus::COMPLETED && !$purchaseOrder->canBeCompleted()) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
-                'message' => 'Purchase order cannot be completed.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(
+                'Purchase order cannot be completed.',
+                null,
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         if ($request->status === PurchaseOrderStatus::CANCELLED && !$purchaseOrder->canBeCancelled()) {
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
-                'message' => 'Purchase order cannot be cancelled.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(
+                'Purchase order cannot be cancelled.',
+                null,
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         DB::beginTransaction();
@@ -294,24 +283,19 @@ class PurchaseOrderController extends Controller
 
             DB::commit();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_OK,
-                'message' => 'Purchase order status updated successfully',
-                'data' => [
-                    'purchaseOrder' => new PurchaseOrderResource($purchaseOrder),
-                ],
-            ]);
+            return $this->successResponse(
+                'Purchase order status updated successfully.',
+                ['purchaseOrder' => new PurchaseOrderResource($purchaseOrder)]
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to update purchase order status',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to update purchase order status.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -323,6 +307,8 @@ class PurchaseOrderController extends Controller
         Shop $shop,
         PurchaseOrder $purchaseOrder
     ): JsonResponse {
+        $this->initRequestTime();
+
         $this->authorize('recordPayment', [$purchaseOrder, $shop]);
 
         DB::beginTransaction();
@@ -339,24 +325,20 @@ class PurchaseOrderController extends Controller
 
             DB::commit();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_CREATED,
-                'message' => 'Payment recorded successfully',
-                'data' => [
-                    'payment' => new PurchasePaymentResource($payment),
-                ],
-            ], Response::HTTP_CREATED);
+            return $this->successResponse(
+                'Payment recorded successfully.',
+                ['payment' => new PurchasePaymentResource($payment)],
+                Response::HTTP_CREATED
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to record payment',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to record payment.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -368,6 +350,8 @@ class PurchaseOrderController extends Controller
         Shop $shop,
         PurchaseOrder $purchaseOrder
     ): JsonResponse {
+        $this->initRequestTime();
+
         $this->authorize('transferStock', [$purchaseOrder, $shop]);
 
         DB::beginTransaction();
@@ -385,24 +369,20 @@ class PurchaseOrderController extends Controller
 
             DB::commit();
 
-            return new JsonResponse([
-                'success' => true,
-                'code' => Response::HTTP_CREATED,
-                'message' => 'Stock transferred successfully',
-                'data' => [
-                    'stockTransfer' => new StockTransferResource($stockTransfer),
-                ],
-            ], Response::HTTP_CREATED);
+            return $this->successResponse(
+                'Stock transferred successfully.',
+                ['stockTransfer' => new StockTransferResource($stockTransfer)],
+                Response::HTTP_CREATED
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return new JsonResponse([
-                'success' => false,
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => 'Failed to transfer stock',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse(
+                'Failed to transfer stock.',
+                ['error' => $e->getMessage()],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
     }
 }
