@@ -35,6 +35,6 @@ return [
     'path' => env('BEEM_PATH', 'beem'),
 
 
-    'sender_name' => env('BEEM_SENDER_NAME'),
+    'sender_name' => env('BEEM_SENDER_NAME', 'Mai Duka'),
 
 ];
