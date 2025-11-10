@@ -89,10 +89,13 @@ export default function Welcome() {
             description: 'Perfect for getting started',
             features: [
                 'Basic inventory management',
-                'Up to 50 products',
                 'Offline mode only',
-                'Single user',
+                'Single Shop Support',
+                'Notifications Disabled',
                 'Basic reports',
+                'No Backup & restore',
+                'No Ads posting',
+
             ],
             cta: 'Start Free',
             popular: false,
@@ -102,15 +105,17 @@ export default function Welcome() {
             name: 'Premium',
             price: '12,000 TZS',
             duration: '/month',
-            description: 'For established retailers',
+            description: 'For established retailers/Wholesalers',
             features: [
-                'Unlimited products',
+                'Unlimited products/services',
                 'Both online & offline mode',
                 'Up to 10 users',
                 'Advanced reports & analytics',
-                'Multi-location support',
+                'Multi-shops support',
+                'Notifications & alerts',
+                'Backup & restore',
+                'Ads Posting ',
                 'Priority support',
-                'API access',
             ],
             cta: 'Start Premium',
             popular: true,
@@ -563,7 +568,8 @@ export default function Welcome() {
                         </p>
                     </div>
 
-                    <div className="mt-16 grid gap-8 lg:grid-cols-4">
+                    <div className={'flex justify-center'}>
+                    <div className="mt-16 grid gap-8 lg:grid-cols-2">
                         {plans.map((plan, index) => (
                             <div
                                 key={index}
@@ -629,6 +635,7 @@ export default function Welcome() {
                                 </Link>
                             </div>
                         ))}
+                    </div>
                     </div>
 
                     <div className="mt-12 text-center">
