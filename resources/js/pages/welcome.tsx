@@ -97,25 +97,10 @@ export default function Welcome() {
             cta: 'Start Free',
             popular: false,
         },
-        {
-            name: 'Basic',
-            price: '9.99',
-            duration: '/month',
-            description: 'For growing businesses',
-            features: [
-                'Advanced inventory management',
-                'Up to 500 products',
-                'Online & Offline mode',
-                'Up to 3 users',
-                'Customer management',
-                'Email support',
-            ],
-            cta: 'Get Started',
-            popular: false,
-        },
+
         {
             name: 'Premium',
-            price: '12,000',
+            price: '12,000 TZS',
             duration: '/month',
             description: 'For established retailers',
             features: [
@@ -130,23 +115,7 @@ export default function Welcome() {
             cta: 'Start Premium',
             popular: true,
         },
-        {
-            name: 'Enterprise',
-            price: '99.99',
-            duration: '/month',
-            description: 'For large-scale operations',
-            features: [
-                'Everything in Premium',
-                'Unlimited users',
-                'Custom integrations',
-                'Dedicated support',
-                'Custom features',
-                'Training & onboarding',
-                'SLA guarantee',
-            ],
-            cta: 'Contact Sales',
-            popular: false,
-        },
+
     ];
 
     const useCases = [
