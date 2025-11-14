@@ -50,7 +50,7 @@ class PhoneAuthController extends Controller
                     'verificationMethod' => 'otp'
                 ]
             ],
-            Response::HTTP_CREATED
+            Response::HTTP_OK
         );
     }
 
@@ -77,7 +77,7 @@ class PhoneAuthController extends Controller
             return $this->errorResponse(
                 'The provided credentials are incorrect.',
                 ['errors' => ['credentials' => ['Invalid phone number or password']]],
-                Response::HTTP_UNAUTHORIZED
+                Response::HTTP_OK
             );
         }
 
@@ -162,7 +162,7 @@ class PhoneAuthController extends Controller
             return $this->errorResponse(
                 'Invalid or expired OTP.',
                 ['errors' => ['otp' => ['The OTP is invalid or has expired']]],
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -196,7 +196,7 @@ class PhoneAuthController extends Controller
             return $this->errorResponse(
                 'Invalid or expired OTP.',
                 ['errors' => ['otp' => ['The OTP is invalid or has expired']]],
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -255,7 +255,7 @@ class PhoneAuthController extends Controller
             return $this->errorResponse(
                 'Invalid or expired OTP.',
                 ['errors' => ['otp' => ['The OTP is invalid or has expired']]],
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
