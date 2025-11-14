@@ -50,7 +50,7 @@ trait HasStandardResponse
     protected function errorResponse(
         string $message,
         mixed $data = null,
-        int $statusCode = Response::HTTP_BAD_REQUEST
+        int $statusCode = Response::HTTP_OK
     ): JsonResponse {
         return new JsonResponse([
             'success' => false,
