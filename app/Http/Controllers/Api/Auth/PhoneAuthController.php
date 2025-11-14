@@ -109,7 +109,16 @@ class PhoneAuthController extends Controller
 
         $user = User::where('phone', $request->phone)->first();
 
-        if (!$user->is_phone_login_enabled) {
+
+        if (!$user) {
+            return $this->errorResponse(
+                'Account does not exist, Please register first.',
+               ['errors' => ['credentials' => ['Invalid phone number or password']]],
+                Response::HTTP_FORBIDDEN
+            );
+        }
+
+        if ($user && !$user->is_phone_login_enabled) {
             return $this->errorResponse(
                 'Phone login is not enabled for this account.',
                 ['errors' => ['phone' => ['OTP login is disabled for this account']]],
