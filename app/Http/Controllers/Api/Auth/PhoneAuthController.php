@@ -114,7 +114,7 @@ class PhoneAuthController extends Controller
             return $this->errorResponse(
                 'Account does not exist, Please register first.',
                ['errors' => ['credentials' => ['Invalid phone number or password']]],
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -122,7 +122,7 @@ class PhoneAuthController extends Controller
             return $this->errorResponse(
                 'Phone login is not enabled for this account.',
                 ['errors' => ['phone' => ['OTP login is disabled for this account']]],
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
