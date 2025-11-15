@@ -121,7 +121,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Seller shop not found or inactive.',
                 null,
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -162,7 +162,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Failed to create purchase order.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -232,7 +232,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Failed to update purchase order.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -253,7 +253,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Purchase order cannot be approved.',
                 null,
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -261,7 +261,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Purchase order cannot be completed.',
                 null,
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -269,7 +269,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Purchase order cannot be cancelled.',
                 null,
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -294,7 +294,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Failed to update purchase order status.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -337,7 +337,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Failed to record payment.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -381,7 +381,7 @@ class PurchaseOrderController extends Controller
             return $this->errorResponse(
                 'Failed to transfer stock.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }

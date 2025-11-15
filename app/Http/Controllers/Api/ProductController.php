@@ -170,7 +170,7 @@ class ProductController extends Controller
             return $this->errorResponse(
                 'Product not found in this shop.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -207,7 +207,7 @@ class ProductController extends Controller
             return $this->errorResponse(
                 'Product not found in this shop.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -296,7 +296,7 @@ class ProductController extends Controller
             return $this->errorResponse(
                 'Product not found in this shop.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -320,7 +320,7 @@ class ProductController extends Controller
             return $this->errorResponse(
                 'Product not found in this shop.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -332,7 +332,7 @@ class ProductController extends Controller
             return $this->errorResponse(
                 'Stock cannot be reduced below zero. Current stock: ' . $oldStock,
                 null,
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -378,7 +378,7 @@ class ProductController extends Controller
             return $this->errorResponse(
                 'Product not found in this shop.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 

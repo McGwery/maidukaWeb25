@@ -162,7 +162,7 @@ class ChatController extends Controller
             return $this->errorResponse(
                 'Cannot send message. One of the shops has blocked the other.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -210,7 +210,7 @@ class ChatController extends Controller
             return $this->errorResponse(
                 'Failed to send message.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }

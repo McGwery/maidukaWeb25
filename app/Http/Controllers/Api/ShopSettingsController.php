@@ -92,7 +92,7 @@ class ShopSettingsController extends Controller
             return $this->errorResponse(
                 'Failed to update shop settings.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -134,7 +134,7 @@ class ShopSettingsController extends Controller
             return $this->errorResponse(
                 'Failed to reset shop settings.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }

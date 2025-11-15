@@ -50,7 +50,7 @@ class ShopMemberController extends Controller
             return $this->errorResponse(
                 'User is already a member of this shop.',
                 null,
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -80,7 +80,7 @@ class ShopMemberController extends Controller
             return $this->errorResponse(
                 'Shop member not found.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -100,7 +100,7 @@ class ShopMemberController extends Controller
             return $this->errorResponse(
                 'Shop member not found.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -109,7 +109,7 @@ class ShopMemberController extends Controller
             return $this->errorResponse(
                 'Cannot modify owner\'s role.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -136,7 +136,7 @@ class ShopMemberController extends Controller
             return $this->errorResponse(
                 'Shop member not found.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -145,7 +145,7 @@ class ShopMemberController extends Controller
             return $this->errorResponse(
                 'Cannot remove shop owner.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 

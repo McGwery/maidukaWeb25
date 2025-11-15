@@ -72,7 +72,7 @@ class POSController extends Controller
                 return $this->errorResponse(
                     'Discounts are not allowed for this shop.',
                     null,
-                    Response::HTTP_FORBIDDEN
+                    Response::HTTP_OK
                 );
             }
 
@@ -85,7 +85,7 @@ class POSController extends Controller
                         'maxDiscountPercentage' => $settings->max_discount_percentage,
                         'requestedDiscount' => $discountPercentage
                     ],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
+                    Response::HTTP_OK
                 );
             }
 
@@ -111,7 +111,7 @@ class POSController extends Controller
                     return $this->errorResponse(
                         'Credit sales are not allowed for this shop.',
                         null,
-                        Response::HTTP_FORBIDDEN
+                        Response::HTTP_OK
                     );
                 }
             }
@@ -133,7 +133,7 @@ class POSController extends Controller
                         return $this->errorResponse(
                             'Customer information is required for credit sales.',
                             null,
-                            Response::HTTP_UNPROCESSABLE_ENTITY
+                            Response::HTTP_OK
                         );
                     }
 
@@ -156,7 +156,7 @@ class POSController extends Controller
                                 'requiredCredit' => $debtAmount,
                                 'availableCredit' => $customer->credit_limit - $customer->current_debt,
                             ],
-                            Response::HTTP_UNPROCESSABLE_ENTITY
+                            Response::HTTP_OK
                         );
                     }
                 }
@@ -214,7 +214,7 @@ class POSController extends Controller
                                 'requestedQuantity' => $itemData['quantity'],
                                 'availableStock' => $product->current_stock,
                             ],
-                            Response::HTTP_UNPROCESSABLE_ENTITY
+                            Response::HTTP_OK
                         );
                     }
 
@@ -302,7 +302,7 @@ class POSController extends Controller
             return $this->errorResponse(
                 'Failed to complete sale: ' . $e->getMessage(),
                 null,
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -506,7 +506,7 @@ class POSController extends Controller
             return $this->errorResponse(
                 'This sale cannot be refunded.',
                 null,
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -588,7 +588,7 @@ class POSController extends Controller
             return $this->errorResponse(
                 'Failed to process refund: ' . $e->getMessage(),
                 null,
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -617,7 +617,7 @@ class POSController extends Controller
             return $this->errorResponse(
                 'This sale has no outstanding debt.',
                 null,
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 
@@ -680,7 +680,7 @@ class POSController extends Controller
             return $this->errorResponse(
                 'Failed to add payment: ' . $e->getMessage(),
                 null,
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -843,7 +843,7 @@ class POSController extends Controller
             return $this->errorResponse(
                 'Cannot delete customer with outstanding debt.',
                 ['currentDebt' => $customer->current_debt],
-                Response::HTTP_UNPROCESSABLE_ENTITY
+                Response::HTTP_OK
             );
         }
 

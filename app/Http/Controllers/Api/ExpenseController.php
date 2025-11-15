@@ -115,7 +115,7 @@ class ExpenseController extends Controller
             return $this->errorResponse(
                 'Expense not found.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -141,7 +141,7 @@ class ExpenseController extends Controller
             return $this->errorResponse(
                 'Expense not found.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -181,7 +181,7 @@ class ExpenseController extends Controller
             return $this->errorResponse(
                 'Expense not found.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 

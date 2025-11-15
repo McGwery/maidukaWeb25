@@ -42,7 +42,7 @@ class AdController extends Controller
             return $this->errorResponse(
                 'No shop found for user.',
                 null,
-                Response::HTTP_BAD_REQUEST
+                Response::HTTP_OK
             );
         }
 

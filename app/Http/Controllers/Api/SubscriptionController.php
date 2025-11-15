@@ -78,7 +78,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'No active subscription found for this shop.',
                 null,
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_OK
             );
         }
 
@@ -103,7 +103,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'Shop already has an active subscription. Please cancel or let it expire before creating a new one.',
                 ['activeSubscription' => new SubscriptionResource($activeSubscription)],
-                Response::HTTP_CONFLICT
+                Response::HTTP_OK
             );
         }
 
@@ -147,7 +147,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'Failed to create subscription.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -164,7 +164,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription does not belong to the specified shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -186,7 +186,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription does not belong to the specified shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -245,7 +245,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'Failed to update subscription.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -262,7 +262,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription does not belong to the specified shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -270,7 +270,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription is already cancelled.',
                 ['subscription' => new SubscriptionResource($subscription)],
-                Response::HTTP_CONFLICT
+                Response::HTTP_OK
             );
         }
 
@@ -288,7 +288,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'Failed to cancel subscription.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -305,7 +305,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription does not belong to the specified shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -341,7 +341,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'Failed to renew subscription.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -358,7 +358,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription does not belong to the specified shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -366,7 +366,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription is already suspended.',
                 ['subscription' => new SubscriptionResource($subscription)],
-                Response::HTTP_CONFLICT
+                Response::HTTP_OK
             );
         }
 
@@ -382,7 +382,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'Failed to suspend subscription.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -399,7 +399,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription does not belong to the specified shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -407,7 +407,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'This subscription is already active.',
                 ['subscription' => new SubscriptionResource($subscription)],
-                Response::HTTP_CONFLICT
+                Response::HTTP_OK
             );
         }
 
@@ -423,7 +423,7 @@ class SubscriptionController extends Controller
             return $this->errorResponse(
                 'Failed to activate subscription.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }

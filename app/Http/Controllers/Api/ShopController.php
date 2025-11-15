@@ -106,7 +106,7 @@ class ShopController extends Controller
             return $this->errorResponse(
                 'Failed to create shop.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_INTERNAL_SERVER_ERROR
+                Response::HTTP_OK
             );
         }
     }
@@ -122,7 +122,7 @@ class ShopController extends Controller
             return $this->errorResponse(
                 'You do not have access to this shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -143,7 +143,7 @@ class ShopController extends Controller
             return $this->errorResponse(
                 'You do not have permission to update this shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -165,7 +165,7 @@ class ShopController extends Controller
             return $this->errorResponse(
                 'Cannot delete the shop while it is set as active for a user.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 
@@ -192,7 +192,7 @@ class ShopController extends Controller
             return $this->errorResponse(
                 $e->getMessage(),
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
     }
@@ -208,7 +208,7 @@ class ShopController extends Controller
             return $this->errorResponse(
                 'You do not have permission to update this shop.',
                 null,
-                Response::HTTP_FORBIDDEN
+                Response::HTTP_OK
             );
         }
 

@@ -38,7 +38,7 @@ class ReportsController extends Controller
             return $this->errorResponse(
                 'No active shop selected.',
                 null,
-                Response::HTTP_BAD_REQUEST
+                Response::HTTP_OK
             );
         }
 
@@ -155,7 +155,7 @@ class ReportsController extends Controller
             return $this->errorResponse(
                 'No active shop selected.',
                 null,
-                Response::HTTP_BAD_REQUEST
+                Response::HTTP_OK
             );
         }
 
@@ -281,7 +281,7 @@ class ReportsController extends Controller
             return $this->errorResponse(
                 'No active shop selected.',
                 null,
-                Response::HTTP_BAD_REQUEST
+                Response::HTTP_OK
             );
         }
 
@@ -475,7 +475,7 @@ class ReportsController extends Controller
             return $this->errorResponse(
                 'No active shop selected.',
                 null,
-                Response::HTTP_BAD_REQUEST
+                Response::HTTP_OK
             );
         }
 
@@ -588,7 +588,7 @@ class ReportsController extends Controller
             return $this->errorResponse(
                 'No active shop selected.',
                 null,
-                Response::HTTP_BAD_REQUEST
+                Response::HTTP_OK
             );
         }
 
