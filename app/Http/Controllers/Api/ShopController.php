@@ -93,6 +93,14 @@ class ShopController extends Controller
                 auth()->user()->switchShop($shop);
             }
 
+            if($request->image_url){
+                $shop->clearMediaCollection('shop_images');
+                $shop->addMediaFromBase64($request->image_url)
+                    ->usingFileName('shop_image_' . $shop->id . '.png')
+                    ->toMediaCollection('shop_images');
+                $shop->update(['image_url' => $shop->getFirstMediaUrl('shop_images')]);
+            }
+
             DB::commit();
 
             return $this->successResponse(

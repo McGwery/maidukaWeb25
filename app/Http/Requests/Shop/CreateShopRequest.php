@@ -21,7 +21,7 @@ class CreateShopRequest extends FormRequest
             'business_type' => ['required', new Enum(ShopType::class)],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'address' => ['required', 'string', 'max:1000'],
-            'agent_code' => ['nullable', 'string', 'unique:shops,agent_code'],
+            'agent_code' => ['nullable', 'string'],
             'currency' => ['required', new Enum(Currency::class)],
             'image_url' => ['nullable', 'url', 'max:2048'],
         ];

@@ -10,10 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Shop extends Model
+class Shop extends Model implements HasMedia
 {
-    use HasFactory, HasUuid, SoftDeletes;
+    use HasFactory, HasUuid, SoftDeletes, InteractsWithMedia;
 
     protected $fillable = [
         'name',
