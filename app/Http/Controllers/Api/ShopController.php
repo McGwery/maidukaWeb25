@@ -114,7 +114,7 @@ class ShopController extends Controller
             return $this->errorResponse(
                 'Failed to create shop.',
                 ['error' => $e->getMessage()],
-                Response::HTTP_OK
+                Response::HTTP_BAD_REQUEST
             );
         }
     }
