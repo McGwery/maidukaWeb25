@@ -31,6 +31,7 @@ class PhoneAuthController extends Controller
         $request->validated();
         $user = User::create([
             'name' => $request->name,
+            'email' => $request->email,
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
             'is_phone_login_enabled' => true,
@@ -62,16 +63,39 @@ class PhoneAuthController extends Controller
         $this->initRequestTime();
 
         // Validation handled by LoginRequest
+        if($request->input('email', null)===null){
+            $request->validate([
+                'phone' => ['required','string'],
+                'password' => ['required', 'string'],
+            ]);
+        }
+        if($request->input('phone', null)===null){
+            $request->validate([
+                'email' => ['required','email', 'string'],
+                'password' => ['required', 'string'],
+            ]);
+        }
+
         $request->validate([
             'phone' => ['required', 'string'],
+            'email' => ['sometimes','email', 'string'],
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::where('phone', $request->phone)
-            ->with(['activeShop.shop' => function($query) {
-                $query->with('owner');
-            }])
-            ->first();
+        if(isset($request->email)){
+            $user = User::where('email', $request->email)
+                ->with(['activeShop.shop' => function($query) {
+                    $query->with('owner');
+                }])
+                ->first();
+        } else {
+            $user = User::where('phone', $request->phone)
+                ->with(['activeShop.shop' => function($query) {
+                    $query->with(['owner','activeSubscription']);
+                }])
+                ->first();
+        }
+
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             return $this->errorResponse(
