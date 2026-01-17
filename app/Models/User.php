@@ -105,13 +105,21 @@ class User extends Authenticatable
             ->where('code', $code)
             ->first();
 
+        // Debug output
+        logger('OTP Debug', [
+            'code_input' => $code,
+            'type' => $type->value,
+            'otp_found' => $otp ? 'yes' : 'no',
+            'expires_at' => $otp?->expires_at?->toDateTimeString(),
+            'now' => now()->toDateTimeString(),
+            'is_future' => $otp?->expires_at?->isFuture(),
+        ]);
+
         if (!$otp || !$otp->isValid()) {
             return false;
         }
 
-        // Delete the OTP after successful verification
         $otp->delete();
-
         return true;
     }
 
