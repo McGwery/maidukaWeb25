@@ -90,6 +90,7 @@ class User extends Authenticatable
             'type' => $type,
             'expires_at' => now()->addMinutes($type->expirationMinutes()),
         ]);
+        logger($generatedOtp);
         SendOtpJob::dispatch($this, $otp);
         return $otp;
     }
